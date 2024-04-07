@@ -1,0 +1,49 @@
+{% extends "cis/logged-base.html" %}
+{%block title %}{{ page_title }}{% endblock %}
+
+{% load templatehelpers %}
+
+{% block body %}
+<main>
+    <div class="">
+        <div class="row">
+            <div class="col-sm-6 col-xs-12">
+                <h1 class="h3 mb-4 text-gray-800">{{ page_title }}&nbsp; 
+                    <small><a href="{% url  urls.add_new %}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i>&nbsp;Add New</a></small>
+                </h1>
+            </div>
+        </div>
+
+        <div class="table-responsive" style="min-height: 500px;">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Submitted On</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th class='text-right'><span class='sr-only'>Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in records %}
+                    <tr>
+                        <td><a href="{% url urls.details r.id %}?{% query_transform %}">{{ r.submitted_on }}</a></td>
+                        <td>{{r.ticket_type}}</td>
+                        <td>{{r.status}}</td>
+                        <td class='text-right'><a class="btn btn-sm btn-default btn-outline-secondary"
+                                href="{% url urls.details r.id %}?{% query_transform %}">View Details</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">Nothing found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% include 'snippets/paginator.html' with records=records %}
+    </div>
+
+</main>
+{% endblock %}

@@ -1,0 +1,11 @@
+include LICENSE
+include README.rst
+recursive-include announcement/datasources *
+recursive-include announcement/forms *
+recursive-include announcement/models *
+recursive-include announcement/urls *
+recursive-include announcement/views *
+recursive-include announcement/static *
+recursive-include announcement/templates *
+recursive-include announcement/management *
+recursive-include announcement/migrations *
