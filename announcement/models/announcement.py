@@ -34,6 +34,19 @@ def bulk_message_media_upload_path(instance, filename):
     now = datetime.datetime.now().strftime("%Y/%m")
     return f'bulk_message/{now}/{instance.id}/{filename}'
 
+
+from django.utils.functional import lazy
+def applies_to_choices():
+    myce_settings = getattr(settings, 'MY_CE')
+
+    roles = myce_settings.get('roles')
+    result = []
+    for role_id, role in roles.items():
+        result.append(
+            (role_id, role['nice_name'])
+        )
+    return result
+    
 class Announcement(models.Model):
     """
     model
@@ -52,9 +65,11 @@ class Announcement(models.Model):
         ('Instructors', 'Instructors'),
         ('Faculty', 'Faculty'),
     ]
+
+
     applies_to = MultiSelectField(
         max_length=300,
-        choices=APPLIES_TO
+        choices=lazy(applies_to_choices, list)()
     )
 
     display_weight = models.SmallIntegerField(default=0)

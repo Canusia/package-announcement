@@ -100,21 +100,35 @@ def show_announcements_for_highschool_admin(request):
     return get_announcements(request, 'highschool_admin')
 
 def get_announcements(request, user_role='student'):
+
+    from django.db.models import Q
+    from functools import reduce
+    import operator
     from datetime import datetime
-    if user_role == 'student':
-        applies_to = 'Students'
-    elif user_role == 'highschool_admin':
-        applies_to = 'High School Administrators'
-    elif user_role == 'teacher':
-        applies_to = 'Instructors'
-    elif user_role == 'faculty':
-        applies_to = 'Faculty'
 
     announcements = Announcement.objects.filter(
-        applies_to__contains=applies_to,
+        # applies_to__contains=applies_to,
         valid_from__lte=datetime.now(),
         valid_until__gte=datetime.now()
-    ).order_by('display_weight')
+    )
+    if request:
+        roles = request.user.get_roles()
+
+        query = reduce(operator.or_, (Q(applies_to__contains=role) for role in roles))
+        announcements = announcements.filter(
+            query
+        )
+
+    # if user_role == 'student':
+    #     applies_to = 'Students'
+    # elif user_role == 'highschool_admin':
+    #     applies_to = 'High School Administrators'
+    # elif user_role == 'teacher':
+    #     applies_to = 'Instructors'
+    # elif user_role == 'faculty':
+    #     applies_to = 'Faculty'
+
+    announcements = announcements.order_by('display_weight')
 
     return announcements
 
