@@ -282,8 +282,6 @@ class BulkMessage(models.Model):
                 if self.meta.get('from_address'):
                     from_address = self.meta.get('from_address')
 
-                to = ['kadaji@gmail.com']
-
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
