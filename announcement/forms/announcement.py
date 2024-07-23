@@ -52,7 +52,7 @@ class BulkMessageFinalizeForm(forms.Form):
 
     cron = forms.CharField(
         max_length=20,
-        help_text='Min Hr Day Month WeekDay. Eg: 10 11 * * 1-3 to send it as 11:10am every Mon, Tue and Wed',
+        help_text='Min Hr Day Month WeekDay. Eg: 10 11 * * 1-3 to send it as 11:10am every Mon, Tue and Wed. See <a target="_blank" href="https://canusia.zendesk.com/hc/en-us/articles/24770549573527-Bulk-Messaging-Cron-Formatting-How-To-Guide">How To</a>',
         label="When should the notification be sent?",
         validators=[validate_cron]
     )

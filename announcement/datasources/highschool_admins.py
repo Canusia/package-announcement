@@ -97,7 +97,7 @@ class highschool_admins_DS(MyCE_BMailerDS):
             queryset=HSPosition.objects.all().order_by('name'),
             required=True,
             label='Role(s)',
-            help_text='Select all the roles that you want to send the email to',
+            help_text='Select all roles this email should be sent to',
             widget=forms.CheckboxSelectMultiple
         )
 
@@ -105,7 +105,7 @@ class highschool_admins_DS(MyCE_BMailerDS):
             choices=HSAdministratorPosition.STATUS_OPTIONS,
             required=True,
             label='Role Status',
-            help_text='Select all the status that you want to send the email to',
+            help_text='Select all statuses this email should be sent to',
             widget=forms.CheckboxSelectMultiple
         )
 
