@@ -2,6 +2,7 @@ import logging, datetime, json
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
+from django.utils.timezone import make_aware
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ class Command(BaseCommand):
 
         ready_messages = BulkMessage.objects.filter(
             status='ready_to_send',
-            send_on_after__lte=datetime.datetime.now(),
+            send_on_after__lte=make_aware(datetime.datetime.now()),
             send_until__gte=timezone.now()
         )
         
@@ -30,12 +31,12 @@ class Command(BaseCommand):
             if bm.should_message_be_sent():
                 log = BulkMessageLog(
                     bulk_message=bm,
-                    run_started_on=datetime.datetime.now()
+                    run_started_on=make_aware(datetime.datetime.now())
                 )
                 
                 # send message
                 summary, detailed_log = bm.send()
-                log.run_completed_on = datetime.datetime.now()
+                log.run_completed_on = make_aware(datetime.datetime.now())
 
                 log.meta = {}
                 log.meta['summary'] = summary

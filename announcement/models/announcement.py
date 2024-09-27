@@ -224,7 +224,7 @@ class BulkMessage(models.Model):
         summary += '<br>Starting to send on - ' + str(datetime.datetime.now())
         summary += '<br>Total Receipients - ' + str(len(recipients))
 
-        if self.is_from_datasource():    
+        if self.is_from_datasource():
             for row in recipients:
                 context = Context(row)
                 text_body = email_template.render(context)
@@ -236,7 +236,8 @@ class BulkMessage(models.Model):
 
                 to = row['email']
                 if type(to) != list:
-                    to = list(to)
+                    to = []
+                    to.append(row['email'])
                 
                 from_address = settings.DEFAULT_FROM_EMAIL
                 if self.meta.get('from_address'):
@@ -276,7 +277,8 @@ class BulkMessage(models.Model):
 
                 to = row.email
                 if type(to) != list:
-                    to = list(to)
+                    to = list()
+                    to.append(row.email)
                 
                 from_address = settings.DEFAULT_FROM_EMAIL
                 if self.meta.get('from_address'):
