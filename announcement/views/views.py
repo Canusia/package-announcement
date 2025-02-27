@@ -7,6 +7,8 @@ from django.urls import reverse_lazy
 
 from django.template.context_processors import csrf
 
+from django.views.decorators.csrf import csrf_exempt
+
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
@@ -87,7 +89,6 @@ class AnnouncementViewSet(viewsets.ReadOnlyModelViewSet):
             )
         else:
             queryset = Announcement.objects.filter(
-                
             )
         return queryset
 
@@ -214,7 +215,6 @@ def index(request):
             }
         )
 
-from django.views.decorators.csrf import csrf_exempt
 
 @user_passes_test(user_has_cis_role, login_url='/')
 def add_new(request):
