@@ -7,11 +7,9 @@ from django.urls import reverse_lazy
 
 from django.template.context_processors import csrf
 
-from django.views.decorators.csrf import csrf_exempt
-
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 
 from cis.models.settings import Setting
 from cis.utils import (
@@ -89,8 +87,31 @@ class AnnouncementViewSet(viewsets.ReadOnlyModelViewSet):
             )
         else:
             queryset = Announcement.objects.filter(
+                
             )
         return queryset
+
+def track_email(request):
+    bulk_message_id = request.GET.get('bulk_message_id')
+    date = request.GET.get('date')
+
+    try:
+        record = BulkMessage.objects.filter(
+            pk=bulk_message_id
+        )
+        print(record)
+        if record:
+            record[0].mark_as_opened(request)
+    except Exception:
+        ...
+
+    # Return a 1x1 transparent image
+    response = HttpResponse(
+        b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\xFF\xFF\xFF\x00\x00\x00\x21\xF9\x04\x01\x00\x00\x00\x00\x2C\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x4C\x01\x00\x3B',
+        content_type="image/gif"
+    )
+    return response
+track_email.login_required=False
 
 @user_passes_test(user_has_student_role, login_url='/')
 def show_announcements_for_students(request):
@@ -215,6 +236,7 @@ def index(request):
             }
         )
 
+from django.views.decorators.csrf import csrf_exempt
 
 @user_passes_test(user_has_cis_role, login_url='/')
 def add_new(request):

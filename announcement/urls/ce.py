@@ -16,7 +16,9 @@ from ..views.views import (
     AnnouncementViewSet,
     BulkMessageViewSet, BulkMessageRecipientViewSet,
     BulkMessageLogViewSet,
-    bulk_message_get_datasource_filters
+    bulk_message_get_datasource_filters,
+
+    track_email
 )
 
 app_name = 'announcements'
@@ -44,4 +46,6 @@ urlpatterns = [
     path('bulk_message/delete_all_recipients/<uuid:record_id>', bulk_message_delete_all_recipients, name='bulk_message_delete_all_recipients'),
 
     path('api/', include(router.urls)),
+
+    path('bulk_mailer/tracker/', track_email, name='track_bulk_mail'),
 ]

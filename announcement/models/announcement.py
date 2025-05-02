@@ -207,6 +207,27 @@ class BulkMessage(models.Model):
                 return True
         return False
 
+    def tracking_url(self, recipient_id):
+        from cis.utils import getDomain
+        url = getDomain() + reverse_lazy('announcements:track_bulk_mail') + f"?bulk_message_id={self.id}&recipient={recipient_id}&date=" + datetime.datetime.now().strftime('%Y-%m-%d')
+
+        img = f'<img src="{url}" width="1" height="1" style="display:none;" alt=""/>'
+        return img
+    
+    def mark_as_opened(self, request):
+        recipient_id = request.GET.get('recipient')
+        
+        datasource_name = self.datasource['name']
+        datasource = BulkMessage.get_datasource_object(datasource_name)
+
+        try:
+            datasource.mark_as_opened(
+                recipient_id,
+                self
+            )
+        except Exception as e:
+            print(e)
+            
     def send(self):
         short_codes = self.short_codes
         email = self.message
@@ -219,6 +240,9 @@ class BulkMessage(models.Model):
             'fail': []
         }
         
+        datasource_name = self.datasource['name']
+        datasource = BulkMessage.get_datasource_object(datasource_name)
+
         recipients = self.recipients()
 
         summary += '<br>Starting to send on - ' + str(datetime.datetime.now())
@@ -234,6 +258,16 @@ class BulkMessage(models.Model):
                     'message': text_body
                 })
 
+                print(row)
+                print(row.get('recipient_id'))
+                print(self.tracking_url(row.get('recipient_id')))
+                return
+                html_body += self.tracking_url(row.get('recipient_id'))
+
+                print(html_body)
+                print()
+                print()
+                return
                 to = row['email']
                 if type(to) != list:
                     to = []
@@ -255,6 +289,16 @@ class BulkMessage(models.Model):
                     from_address,
                     to
                 )
+
+                try:
+                    # tell the datasource that the message has been sent
+                    datasource.post_send(
+                        row,
+                        self
+                    )
+                except Exception as e:
+                    print(e)
+                break
         else:
             short_codes = self.short_codes
 
@@ -338,11 +382,15 @@ class BulkMessage(models.Model):
 
         if self.media:
             decoded_file = get_uploaded_file(self.media.name)
+            print(decoded_file)
+            
             reader = csv.DictReader(io.StringIO(decoded_file))
         
             added = 0
             for row in reader:
-                
+
+                print(row)
+                        
                 formatted_row = {}
                 for k, v in row.items():
                     formatted_row[
