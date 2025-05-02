@@ -258,16 +258,8 @@ class BulkMessage(models.Model):
                     'message': text_body
                 })
 
-                print(row)
-                print(row.get('recipient_id'))
-                print(self.tracking_url(row.get('recipient_id')))
-                return
                 html_body += self.tracking_url(row.get('recipient_id'))
 
-                print(html_body)
-                print()
-                print()
-                return
                 to = row['email']
                 if type(to) != list:
                     to = []
