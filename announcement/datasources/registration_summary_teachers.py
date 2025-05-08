@@ -208,7 +208,7 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
             except:
                 ...
 
-            row['email'] = ["kadaji@gmail.com"]
+            # row['email'] = ["kadaji@gmail.com"]
             result.append(row)
 
         return result
