@@ -6,6 +6,7 @@ BMAILER_DS = [
     ('teachers', 'Teachers'),
     
     ('registration_summary_teachers', 'Registration Summary - For Teachers'),
+    ('registration_summary_highschools', 'Registration Summary - For High Schools'),
 ]
 
 class AnnouncementConfig(AppConfig):
