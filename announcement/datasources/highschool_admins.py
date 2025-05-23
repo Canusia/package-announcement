@@ -144,18 +144,18 @@ class highschool_admins_DS(MyCE_BMailerDS):
 
         for r in records:
             row = {
-                'FirstName': r.user.first_name,
-                'LastName': r.user.last_name,
+                'FirstName': r.hsadmin.user.first_name,
+                'LastName': r.hsadmin.user.last_name,
                 'email': [
-                    r.user.email,
+                    r.hsadmin.user.email,
                 ],
                 'HighSchool': r.highschool.name,
                 'PositionTitle': r.position.name
             }
             try:
-                validate_email(r.user.secondary_email)
-                if r.user.secondary_email:
-                    row['email'].append(r.user.secondary_email)
+                validate_email(r.hsadmin.user.secondary_email)
+                if r.hsadmin.user.secondary_email:
+                    row['email'].append(r.hsadmin.user.secondary_email)
             except:
                 ...
             result.append(row)
