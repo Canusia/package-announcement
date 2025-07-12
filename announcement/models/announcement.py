@@ -455,9 +455,12 @@ class BulkMessage(models.Model):
     @classmethod
     def get_datasource_object(cls, datasource_name):
         path = 'announcement.datasources'
-        ds_class = import_string(f'{path}.{datasource_name}.{datasource_name}_DS')
 
-        return ds_class()
+        try:
+            ds_class = import_string(f'{path}.{datasource_name}.{datasource_name}_DS')
+            return ds_class()
+        except ImportError:
+            return None
 
     def is_from_datasource(self):
         return True if self.datasource['name'] != 'file_upload' else False
