@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 from django.utils import timezone
 from django.core.files.base import ContentFile, File
 
-from announcement.models.announcement import BulkMessage, BulkMessageLog
+from ...models.announcement import BulkMessage, BulkMessageLog
+# from ..models.announcement import BulkMessage, BulkMessageLog
 class Command(BaseCommand):
     '''
     Daily jobs

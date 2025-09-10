@@ -106,8 +106,27 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
             help_text=''
         )
 
+        form.fields['ds_mode'] = forms.ChoiceField(
+            choices=[
+                ('', 'Select Mode'),
+                ('test', 'Test'),
+                ('live', 'Live'),
+            ],
+            required=True,
+            label='Mode',
+            help_text=''
+        )
+
+        form.fields['ds_test_email'] = forms.CharField(
+            required=False,
+            label='Test Email(s)',
+            help_text='Comma separated email addresses to send test emails to',
+        )
+
         if initial:
             form.fields['ds_term'].initial = initial.get('term')
+            form.fields['ds_mode'].initial = initial.get('mode')
+            form.fields['ds_test_email'].initial = initial.get('test_email', [])[0]
 
         template = 'announcements/datasource-form.html'
         template = get_template(template)
@@ -169,10 +188,15 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
         """
         result = []
         
-        sections = ClassSection.objects.filter(
-            registration_term__id__in=filters.get('term')
-        )
-
+        try:
+            sections = ClassSection.objects.filter(
+                registration_term__id__in=filters.get('term')
+            )
+        except:
+             sections = ClassSection.objects.filter(
+                term__id__in=filters.get('term')
+            )
+             
         records = Teacher.objects.filter(
             id__in=sections.values('teacher__id')
         )
@@ -185,10 +209,20 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
 
             sections_assigned, registrations, sections_with_no_registrations, missing_payment, completed_application, missing_parent_consent = record.sections_summary(terms=terms)
 
+            email = [record.user.email]
+            # if record.user.secondary_email:
+            #     email.append(record.user.secondary_email)
+
+            if filters.get('mode', [])[0] == 'test':
+                if type(filters.get('test_email')) == list:
+                    email = filters.get('test_email')[0].strip().split(',')
+                else:
+                    email = filters.get('test_email').strip().split(',')
+
             row = {
                 "TeacherFirstName": record.user.first_name,
                 "TeacherLastName": record.user.last_name,
-                "email": [record.user.email],
+                "email": email,
                 "SectionsAssigned": sections_assigned.count(),
                 "NumberOfRegistrationsRequests": registrations.count(),
                 "SectionsWithNoRegistrationRequests": sections_with_no_registrations.count(),
@@ -203,12 +237,13 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
 
             try:
                 validate_email(record.user.secondary_email)
-                if record.user.secondary_email:
+                if record.user.secondary_email and record.user.secondary_email not in row['email']:
                     row['email'].append(record.user.secondary_email)
             except:
                 ...
 
             # row['email'] = ["kadaji@gmail.com"]
+            # print(row)
             result.append(row)
 
         return result

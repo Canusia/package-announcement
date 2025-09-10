@@ -16,8 +16,8 @@ from django_ckeditor_5.widgets import CKEditor5Widget as CKEditorWidget
 from cis.models.customuser import CustomUser
 
 from cis.utils import YES_NO_OPTIONS
-from announcement.models.announcement import Announcement, BulkMessage
-from announcement.apps import BMAILER_DS
+from ..models.announcement import Announcement, BulkMessage
+from ..apps import BMAILER_DS
 
 def format_cols(columns):
     result = {}

@@ -22,17 +22,9 @@ from cron_validator import CronValidator
 from cis.storage_backend import PrivateMediaStorage
 
 from django_ckeditor_5.fields import CKEditor5Field as RichTextField
-from cis.utils import get_uploaded_file
+from cis.utils import get_uploaded_file, bulk_message_log_upload_path, bulk_message_media_upload_path
 
 logger = logging.getLogger(__name__)
-
-def bulk_message_log_upload_path(instance, filename):
-    now = datetime.datetime.now().strftime("%Y/%m")
-    return f'bulk_message_logs/{now}/{instance.id}/{filename}'
-
-def bulk_message_media_upload_path(instance, filename):
-    now = datetime.datetime.now().strftime("%Y/%m")
-    return f'bulk_message/{now}/{instance.id}/{filename}'
 
 
 from django.utils.functional import lazy
@@ -242,6 +234,7 @@ class BulkMessage(models.Model):
         
         datasource_name = self.datasource['name']
         datasource = BulkMessage.get_datasource_object(datasource_name)
+
 
         recipients = self.recipients()
 
@@ -455,11 +448,14 @@ class BulkMessage(models.Model):
     @classmethod
     def get_datasource_object(cls, datasource_name):
         path = 'announcement.datasources'
-
         try:
-            ds_class = import_string(f'{path}.{datasource_name}.{datasource_name}_DS')
+            if getattr(settings, 'DEBUG', False):
+                ds_class = import_string(f'announcement.{path}.{datasource_name}.{datasource_name}_DS')
+            else:
+                ds_class = import_string(f'{path}.{datasource_name}.{datasource_name}_DS')
             return ds_class()
         except ImportError:
+            print('failed to import datasource')
             return None
 
     def is_from_datasource(self):
