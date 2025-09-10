@@ -11,3 +11,6 @@ BMAILER_DS = [
 
 class AnnouncementConfig(AppConfig):
     name = 'announcement'
+
+class DevAnnouncementConfig(AppConfig):
+    name = 'announcement.announcement'
