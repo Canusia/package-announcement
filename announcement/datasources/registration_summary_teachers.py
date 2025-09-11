@@ -210,8 +210,13 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
             sections_assigned, registrations, sections_with_no_registrations, missing_payment, completed_application, missing_parent_consent = record.sections_summary(terms=terms)
 
             email = [record.user.email]
-            # if record.user.secondary_email:
-            #     email.append(record.user.secondary_email)
+
+            try:
+                validate_email(record.user.secondary_email)
+                if record.user.secondary_email and record.user.secondary_email not in row['email']:
+                    row['email'].append(record.user.secondary_email)
+            except:
+                ...
 
             if filters.get('mode', [])[0] == 'test':
                 if type(filters.get('test_email')) == list:
@@ -235,12 +240,6 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
                 "Term": str(terms[0]),
             }
 
-            try:
-                validate_email(record.user.secondary_email)
-                if record.user.secondary_email and record.user.secondary_email not in row['email']:
-                    row['email'].append(record.user.secondary_email)
-            except:
-                ...
 
             # row['email'] = ["kadaji@gmail.com"]
             # print(row)
