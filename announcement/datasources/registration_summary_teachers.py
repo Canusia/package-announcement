@@ -213,8 +213,8 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
 
             try:
                 validate_email(record.user.secondary_email)
-                if record.user.secondary_email and record.user.secondary_email not in row['email']:
-                    row['email'].append(record.user.secondary_email)
+                if record.user.secondary_email and record.user.secondary_email not in email:
+                    email.append(record.user.secondary_email)
             except:
                 ...
 
