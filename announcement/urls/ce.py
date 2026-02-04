@@ -24,10 +24,10 @@ from ..views.views import (
 app_name = 'announcements'
 
 router = routers.DefaultRouter()
-router.register('announcements', AnnouncementViewSet, basename=app_name)
-router.register('bulk_messages', BulkMessageViewSet, basename=app_name)
-router.register('bulk_message_logs', BulkMessageLogViewSet, basename=app_name)
-router.register('bulk_messages_recipients', BulkMessageRecipientViewSet, basename=app_name)
+router.register('announcements', AnnouncementViewSet, basename='announcements')
+router.register('bulk_messages', BulkMessageViewSet, basename='bulk_messages')
+router.register('bulk_message_logs', BulkMessageLogViewSet, basename='bulk_message_logs')
+router.register('bulk_messages_recipients', BulkMessageRecipientViewSet, basename='bulk_messages_recipients')
 
 urlpatterns = [
     path('', index, name='all'),
