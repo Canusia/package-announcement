@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
-from cis.validators import validate_html_short_code, validate_cron
+from cis.validators import validate_html_short_code
 
 from form_fields import fields as FFields
 
@@ -50,11 +50,15 @@ class BulkMessageFinalizeForm(forms.Form):
         required=True
     )
 
-    cron = forms.CharField(
-        max_length=20,
-        help_text='Min Hr Day Month WeekDay. Eg: 10 11 * * 1-3 to send it as 11:10am every Mon, Tue and Wed. See <a target="_blank" href="https://canusia.zendesk.com/hc/en-us/articles/24770549573527-Bulk-Messaging-Cron-Formatting-How-To-Guide">How To</a>',
-        label="When should the notification be sent?",
-        validators=[validate_cron]
+    send_time = forms.CharField(
+        required=True,
+        help_text='Select the time of day to send the message',
+        label='Send At Time',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control send-time-picker',
+            'placeholder': 'Click to select time',
+            'readonly': 'readonly'
+        })
     )
 
     send_dates = forms.CharField(
@@ -82,7 +86,7 @@ class BulkMessageFinalizeForm(forms.Form):
         self.fields['title'].initial = record.title
         self.fields['status'].initial = record.status
         self.fields['send_dates'].initial = record.meta.get('send_dates', '')
-        self.fields['cron'].initial = record.cron
+        self.fields['send_time'].initial = record.meta.get('send_time', '')
 
         if request:
             self.helper.form_action = reverse_lazy(
@@ -111,17 +115,27 @@ class BulkMessageFinalizeForm(forms.Form):
                 raise ValidationError(f'Invalid date format: {date_str}. Use MM/DD/YYYY.')
         return send_dates_str
 
+    def clean_send_time(self):
+        send_time_str = self.cleaned_data.get('send_time', '')
+        if not send_time_str:
+            raise ValidationError('Please select a time.')
+        try:
+            datetime.datetime.strptime(send_time_str, '%I:%M %p')
+        except ValueError:
+            raise ValidationError(f'Invalid time format: {send_time_str}. Use HH:MM AM/PM.')
+        return send_time_str
+
     def save(self, request, record, commit=True):
         data = self.cleaned_data
 
         record.title = data.get('title')
         record.status = data.get('status')
-        record.cron = data.get('cron')
 
         if not record.meta:
             record.meta = {}
 
         record.meta['send_dates'] = data.get('send_dates')
+        record.meta['send_time'] = data.get('send_time')
         record.save()
 
         return record

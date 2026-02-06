@@ -57,7 +57,31 @@
         });
     }
 
-    $(document).ready(function() { initSendDatesPicker(); });
+    function initSendTimePicker() {
+        var $picker = $('.send-time-picker');
+        if (!$picker.length || $picker.data('flatpickr-initialized')) return;
+
+        loadFlatpickr(function() {
+            if (typeof flatpickr === 'undefined') {
+                $picker.removeAttr('readonly');
+                $picker.attr('placeholder', 'Enter time: HH:MM AM/PM');
+                return;
+            }
+            flatpickr($picker[0], {
+                enableTime: true,
+                noCalendar: true,
+                dateFormat: 'h:i K',
+                allowInput: false,
+                clickOpens: true
+            });
+            $picker.data('flatpickr-initialized', true);
+        });
+    }
+
+    $(document).ready(function() {
+        initSendDatesPicker();
+        initSendTimePicker();
+    });
 </script>
 
 <script>

@@ -17,7 +17,6 @@ from django.shortcuts import render, get_object_or_404
 from django.db.models import JSONField
 
 from mailer import send_mail, send_html_mail
-from cron_validator import CronValidator
 
 from cis.storage_backend import PrivateMediaStorage
 
@@ -200,22 +199,22 @@ class BulkMessage(models.Model):
         if not date_match:
             return False
 
-        # Check cron expression for time-of-day
-        cron_scheduler_start_time = datetime.datetime.now().replace(
-            microsecond=0,
-            second=0
-        )
+        # Check if current time is within the send window
+        send_time_str = self.meta.get('send_time', '')
+        if not send_time_str:
+            return False
 
-        cron_scheduler_end_time = cron_scheduler_start_time + datetime.timedelta(
-            minutes=getattr(settings, 'MYCE_CRON_INTERVAL')
-        )
+        try:
+            send_time = datetime.datetime.strptime(send_time_str, '%I:%M %p').time()
+        except ValueError:
+            return False
 
-        executors = CronValidator.get_execution_time(
-            self.cron,
-            from_dt=cron_scheduler_start_time,
-            to_dt=cron_scheduler_end_time
-        )
-        return bool(executors)
+        now = datetime.datetime.now()
+        cron_interval = getattr(settings, 'MYCE_CRON_INTERVAL', 60)
+        window_start = now - datetime.timedelta(minutes=cron_interval)
+
+        send_dt = datetime.datetime.combine(today, send_time)
+        return window_start <= send_dt <= now
 
     def tracking_url(self, recipient_id):
         from cis.utils import getDomain
