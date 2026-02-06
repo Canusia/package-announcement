@@ -17,7 +17,6 @@ from django.shortcuts import render, get_object_or_404
 from django.db.models import JSONField
 
 from mailer import send_mail, send_html_mail
-from cron_validator import CronValidator
 
 from cis.storage_backend import PrivateMediaStorage
 
@@ -179,25 +178,43 @@ class BulkMessage(models.Model):
         if self.status != 'ready_to_send':
             return False
 
-        cron_scheduler_start_time = datetime.datetime.now().replace(
-            microsecond=0,
-            second=0
-        )
+        # Check if today is one of the selected send dates
+        send_dates_str = self.meta.get('send_dates', '')
+        if not send_dates_str:
+            return False
 
-        cron_scheduler_end_time = cron_scheduler_start_time + datetime.timedelta(
-            minutes=getattr(settings, 'MYCE_CRON_INTERVAL')
-        )
+        today = datetime.date.today()
+        send_dates = [d.strip() for d in send_dates_str.split(',') if d.strip()]
 
-        executors = CronValidator.get_execution_time(
-            self.cron,
-            from_dt=cron_scheduler_start_time,
-            to_dt=cron_scheduler_end_time
-        )
-        
-        if executors:
-            for executor in executors:
-                return True
-        return False
+        date_match = False
+        for d in send_dates:
+            try:
+                parsed = datetime.datetime.strptime(d, '%m/%d/%Y').date()
+                if parsed == today:
+                    date_match = True
+                    break
+            except ValueError:
+                continue
+
+        if not date_match:
+            return False
+
+        # Check if current time is within the send window
+        send_time_str = self.meta.get('send_time', '')
+        if not send_time_str:
+            return False
+
+        try:
+            send_time = datetime.datetime.strptime(send_time_str, '%I:%M %p').time()
+        except ValueError:
+            return False
+
+        now = datetime.datetime.now()
+        cron_interval = getattr(settings, 'MYCE_CRON_INTERVAL', 60)
+        window_start = now - datetime.timedelta(minutes=cron_interval)
+
+        send_dt = datetime.datetime.combine(today, send_time)
+        return window_start <= send_dt <= now
 
     def tracking_url(self, recipient_id):
         from cis.utils import getDomain
@@ -258,20 +275,16 @@ class BulkMessage(models.Model):
                     to = []
                     to.append(row['email'])
                 
-                from_address = settings.DEFAULT_FROM_EMAIL
-                if self.meta.get('from_address'):
-                    from_address = self.meta.get('from_address')
-
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
                     })
-                    
+
                 send_html_mail(
                     self.subject(),
                     text_body,
                     html_body,
-                    from_address,
+                    settings.DEFAULT_FROM_EMAIL,
                     to
                 )
 
@@ -309,20 +322,16 @@ class BulkMessage(models.Model):
                     to = list()
                     to.append(row.email)
                 
-                from_address = settings.DEFAULT_FROM_EMAIL
-                if self.meta.get('from_address'):
-                    from_address = self.meta.get('from_address')
-
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
                     })
-                    
+
                 send_html_mail(
                     self.subject(),
                     text_body,
                     html_body,
-                    from_address,
+                    settings.DEFAULT_FROM_EMAIL,
                     to
                 )
 

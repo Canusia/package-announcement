@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
-from cis.validators import validate_html_short_code, validate_cron
+from cis.validators import validate_html_short_code
 
 from form_fields import fields as FFields
 
@@ -50,31 +50,26 @@ class BulkMessageFinalizeForm(forms.Form):
         required=True
     )
 
-    cron = forms.CharField(
-        max_length=20,
-        help_text='Min Hr Day Month WeekDay. Eg: 10 11 * * 1-3 to send it as 11:10am every Mon, Tue and Wed. See <a target="_blank" href="https://canusia.zendesk.com/hc/en-us/articles/24770549573527-Bulk-Messaging-Cron-Formatting-How-To-Guide">How To</a>',
-        label="When should the notification be sent?",
-        validators=[validate_cron]
+    send_time = forms.CharField(
+        required=True,
+        help_text='Select the time of day to send the message',
+        label='Send At Time',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control send-time-picker',
+            'placeholder': 'Click to select time',
+            'readonly': 'readonly'
+        })
     )
 
-    send_after = forms.DateField(
-        widget=forms.DateInput(format='%m/%d/%Y', attrs={'class':'col-md-8 col-sm-12'}),
-        label='Schedule to Send Starting On',
-        help_text='Select a date in the future to send.',
-        input_formats=[('%m/%d/%Y')]
-    )
-
-    send_until = forms.DateField(
-        widget=forms.DateInput(format='%m/%d/%Y', attrs={'class':'col-md-8 col-sm-12'}),
-        label='Keep Sending Until',
-        help_text='',
-        input_formats=[('%m/%d/%Y')]
-    )
-
-    from_address = forms.EmailField(
-        label='From Address',
-        help_text='The default from address will be ' + settings.DEFAULT_FROM_EMAIL + ". In some configurations it is better to leave this unchanged.",
-        required=True
+    send_dates = forms.CharField(
+        required=True,
+        help_text='Click to select one or more dates to send the message',
+        label='Send On Date(s)',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control send-dates-picker',
+            'placeholder': 'Click to select dates',
+            'readonly': 'readonly'
+        })
     )
 
     def __init__(self, request, record=None, *args, **kwargs):
@@ -90,19 +85,8 @@ class BulkMessageFinalizeForm(forms.Form):
 
         self.fields['title'].initial = record.title
         self.fields['status'].initial = record.status
-        
-        if not record.meta.get('from_address'):
-            self.fields['from_address'].initial = settings.DEFAULT_FROM_EMAIL
-        else:
-            self.fields['from_address'].initial = record.meta.get('from_address')
-
-        if record.send_on_after:
-            self.fields['send_after'].initial = record.send_on_after.strftime('%m/%d/%Y')
-
-        if record.send_until:
-            self.fields['send_until'].initial = record.send_until.strftime('%m/%d/%Y')
-
-        self.fields['cron'].initial = record.cron
+        self.fields['send_dates'].initial = record.meta.get('send_dates', '')
+        self.fields['send_time'].initial = record.meta.get('send_time', '')
 
         if request:
             self.helper.form_action = reverse_lazy(
@@ -118,27 +102,40 @@ class BulkMessageFinalizeForm(forms.Form):
 
         return self.cleaned_data.get('status')
 
-    def clean_send_after(self):
-        data = self.cleaned_data.get('send_after')
+    def clean_send_dates(self):
+        send_dates_str = self.cleaned_data.get('send_dates', '')
+        if not send_dates_str:
+            raise ValidationError('Please select at least one date.')
 
-        # if data <= datetime.date.today():
-        #     raise ValidationError('Please choose a date in the future')
-        return data
-    
+        dates = [d.strip() for d in send_dates_str.split(',') if d.strip()]
+        for date_str in dates:
+            try:
+                datetime.datetime.strptime(date_str, '%m/%d/%Y')
+            except ValueError:
+                raise ValidationError(f'Invalid date format: {date_str}. Use MM/DD/YYYY.')
+        return send_dates_str
+
+    def clean_send_time(self):
+        send_time_str = self.cleaned_data.get('send_time', '')
+        if not send_time_str:
+            raise ValidationError('Please select a time.')
+        try:
+            datetime.datetime.strptime(send_time_str, '%I:%M %p')
+        except ValueError:
+            raise ValidationError(f'Invalid time format: {send_time_str}. Use HH:MM AM/PM.')
+        return send_time_str
+
     def save(self, request, record, commit=True):
         data = self.cleaned_data
 
         record.title = data.get('title')
         record.status = data.get('status')
-        record.send_on_after = data.get('send_after')
-        record.send_until = data.get('send_until')
-        record.cron = data.get('cron')
 
         if not record.meta:
             record.meta = {}
 
-        record.meta['from_address'] = data.get('from_address')
-        print(record.meta)
+        record.meta['send_dates'] = data.get('send_dates')
+        record.meta['send_time'] = data.get('send_time')
         record.save()
 
         return record
