@@ -179,6 +179,28 @@ class BulkMessage(models.Model):
         if self.status != 'ready_to_send':
             return False
 
+        # Check if today is one of the selected send dates
+        send_dates_str = self.meta.get('send_dates', '')
+        if not send_dates_str:
+            return False
+
+        today = datetime.date.today()
+        send_dates = [d.strip() for d in send_dates_str.split(',') if d.strip()]
+
+        date_match = False
+        for d in send_dates:
+            try:
+                parsed = datetime.datetime.strptime(d, '%m/%d/%Y').date()
+                if parsed == today:
+                    date_match = True
+                    break
+            except ValueError:
+                continue
+
+        if not date_match:
+            return False
+
+        # Check cron expression for time-of-day
         cron_scheduler_start_time = datetime.datetime.now().replace(
             microsecond=0,
             second=0
@@ -193,11 +215,7 @@ class BulkMessage(models.Model):
             from_dt=cron_scheduler_start_time,
             to_dt=cron_scheduler_end_time
         )
-        
-        if executors:
-            for executor in executors:
-                return True
-        return False
+        return bool(executors)
 
     def tracking_url(self, recipient_id):
         from cis.utils import getDomain
@@ -258,20 +276,16 @@ class BulkMessage(models.Model):
                     to = []
                     to.append(row['email'])
                 
-                from_address = settings.DEFAULT_FROM_EMAIL
-                if self.meta.get('from_address'):
-                    from_address = self.meta.get('from_address')
-
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
                     })
-                    
+
                 send_html_mail(
                     self.subject(),
                     text_body,
                     html_body,
-                    from_address,
+                    settings.DEFAULT_FROM_EMAIL,
                     to
                 )
 
@@ -309,20 +323,16 @@ class BulkMessage(models.Model):
                     to = list()
                     to.append(row.email)
                 
-                from_address = settings.DEFAULT_FROM_EMAIL
-                if self.meta.get('from_address'):
-                    from_address = self.meta.get('from_address')
-
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
                     })
-                    
+
                 send_html_mail(
                     self.subject(),
                     text_body,
                     html_body,
-                    from_address,
+                    settings.DEFAULT_FROM_EMAIL,
                     to
                 )
 

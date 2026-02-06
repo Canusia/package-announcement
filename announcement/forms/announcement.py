@@ -57,24 +57,15 @@ class BulkMessageFinalizeForm(forms.Form):
         validators=[validate_cron]
     )
 
-    send_after = forms.DateField(
-        widget=forms.DateInput(format='%m/%d/%Y', attrs={'class':'col-md-8 col-sm-12'}),
-        label='Schedule to Send Starting On',
-        help_text='Select a date in the future to send.',
-        input_formats=[('%m/%d/%Y')]
-    )
-
-    send_until = forms.DateField(
-        widget=forms.DateInput(format='%m/%d/%Y', attrs={'class':'col-md-8 col-sm-12'}),
-        label='Keep Sending Until',
-        help_text='',
-        input_formats=[('%m/%d/%Y')]
-    )
-
-    from_address = forms.EmailField(
-        label='From Address',
-        help_text='The default from address will be ' + settings.DEFAULT_FROM_EMAIL + ". In some configurations it is better to leave this unchanged.",
-        required=True
+    send_dates = forms.CharField(
+        required=True,
+        help_text='Click to select one or more dates to send the message',
+        label='Send On Date(s)',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control send-dates-picker',
+            'placeholder': 'Click to select dates',
+            'readonly': 'readonly'
+        })
     )
 
     def __init__(self, request, record=None, *args, **kwargs):
@@ -90,18 +81,7 @@ class BulkMessageFinalizeForm(forms.Form):
 
         self.fields['title'].initial = record.title
         self.fields['status'].initial = record.status
-        
-        if not record.meta.get('from_address'):
-            self.fields['from_address'].initial = settings.DEFAULT_FROM_EMAIL
-        else:
-            self.fields['from_address'].initial = record.meta.get('from_address')
-
-        if record.send_on_after:
-            self.fields['send_after'].initial = record.send_on_after.strftime('%m/%d/%Y')
-
-        if record.send_until:
-            self.fields['send_until'].initial = record.send_until.strftime('%m/%d/%Y')
-
+        self.fields['send_dates'].initial = record.meta.get('send_dates', '')
         self.fields['cron'].initial = record.cron
 
         if request:
@@ -118,27 +98,30 @@ class BulkMessageFinalizeForm(forms.Form):
 
         return self.cleaned_data.get('status')
 
-    def clean_send_after(self):
-        data = self.cleaned_data.get('send_after')
+    def clean_send_dates(self):
+        send_dates_str = self.cleaned_data.get('send_dates', '')
+        if not send_dates_str:
+            raise ValidationError('Please select at least one date.')
 
-        # if data <= datetime.date.today():
-        #     raise ValidationError('Please choose a date in the future')
-        return data
-    
+        dates = [d.strip() for d in send_dates_str.split(',') if d.strip()]
+        for date_str in dates:
+            try:
+                datetime.datetime.strptime(date_str, '%m/%d/%Y')
+            except ValueError:
+                raise ValidationError(f'Invalid date format: {date_str}. Use MM/DD/YYYY.')
+        return send_dates_str
+
     def save(self, request, record, commit=True):
         data = self.cleaned_data
 
         record.title = data.get('title')
         record.status = data.get('status')
-        record.send_on_after = data.get('send_after')
-        record.send_until = data.get('send_until')
         record.cron = data.get('cron')
 
         if not record.meta:
             record.meta = {}
 
-        record.meta['from_address'] = data.get('from_address')
-        print(record.meta)
+        record.meta['send_dates'] = data.get('send_dates')
         record.save()
 
         return record

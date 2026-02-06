@@ -22,9 +22,7 @@ class Command(BaseCommand):
         # get all 'ready to send' messages
 
         ready_messages = BulkMessage.objects.filter(
-            status='ready_to_send',
-            send_on_after__lte=make_aware(datetime.datetime.now()),
-            send_until__gte=timezone.now()
+            status='ready_to_send'
         )
         
         for bm in ready_messages:

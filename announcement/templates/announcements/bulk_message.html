@@ -7,6 +7,60 @@
 {% block body %}
 
 <script>
+    // Load flatpickr dynamically for multidate picker
+    function loadFlatpickr(callback) {
+        if (typeof flatpickr !== 'undefined') {
+            callback();
+            return;
+        }
+        if (!document.querySelector('link[href*="flatpickr"]')) {
+            var css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+            document.head.appendChild(css);
+        }
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+        script.onload = callback;
+        script.onerror = function() {
+            console.warn('Failed to load flatpickr, using plain text input fallback');
+            callback();
+        };
+        document.head.appendChild(script);
+    }
+
+    function initSendDatesPicker() {
+        var $picker = $('.send-dates-picker');
+        if (!$picker.length || $picker.data('flatpickr-initialized')) return;
+
+        loadFlatpickr(function() {
+            if (typeof flatpickr === 'undefined') {
+                $picker.removeAttr('readonly');
+                $picker.attr('placeholder', 'Enter dates: MM/DD/YYYY, MM/DD/YYYY');
+                return;
+            }
+            flatpickr($picker[0], {
+                mode: 'multiple',
+                dateFormat: 'm/d/Y',
+                conjunction: ', ',
+                allowInput: false,
+                clickOpens: true,
+                onChange: function(selectedDates, dateStr, instance) {
+                    selectedDates.sort(function(a, b) { return a - b; });
+                    var formatted = selectedDates.map(function(d) {
+                        return instance.formatDate(d, 'm/d/Y');
+                    }).join(', ');
+                    $picker.val(formatted);
+                }
+            });
+            $picker.data('flatpickr-initialized', true);
+        });
+    }
+
+    $(document).ready(function() { initSendDatesPicker(); });
+</script>
+
+<script>
 
     var inputsChanged = false;
     $(document).on('change', 'form#frm_bulk_message input, form#frm_bulk_message textarea', function () {
