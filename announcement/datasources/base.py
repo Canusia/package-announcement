@@ -4,12 +4,32 @@ from django.template import Context, Template
 from django.template.loader import get_template
 
 from django.core.validators import RegexValidator, validate_email
+from django.core.exceptions import ValidationError
 from django.utils.safestring import mark_safe
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
 from cis.models.teacher import Teacher
+
+
+def valid_emails(addresses):
+    """Split addresses into (valid, invalid) lists.
+
+    Accepts a single string or a list/iterable of strings. Used to drop bad
+    addresses before queueing/sending a bulk message.
+    """
+    if isinstance(addresses, str):
+        addresses = [addresses]
+    valid, invalid = [], []
+    for addr in (addresses or []):
+        candidate = (addr or '').strip()
+        try:
+            validate_email(candidate)
+            valid.append(candidate)
+        except ValidationError:
+            invalid.append(addr)
+    return valid, invalid
 
 class MyCE_BMailerForm(forms.Form):
     

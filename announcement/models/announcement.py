@@ -273,7 +273,16 @@ class BulkMessage(models.Model):
                 if type(to) != list:
                     to = []
                     to.append(row['email'])
-                
+
+                from ..datasources.base import valid_emails
+                to, bad = valid_emails(to)
+                if bad:
+                    detailed_log.setdefault('invalid', []).extend(bad)
+                if not to:
+                    detailed_log.setdefault('skipped', []).append(
+                        row.get(datasource.name_columns[0], '') if isinstance(row, dict) else '')
+                    continue
+
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
@@ -320,7 +329,14 @@ class BulkMessage(models.Model):
                 if type(to) != list:
                     to = list()
                     to.append(row.email)
-                
+
+                from ..datasources.base import valid_emails
+                to, bad = valid_emails(to)
+                if bad:
+                    detailed_log.setdefault('invalid', []).extend(bad)
+                if not to:
+                    continue
+
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
@@ -389,6 +405,14 @@ class BulkMessage(models.Model):
                     formatted_row[
                         formatted_cols.get(k)
                     ] = v
+
+                from ..datasources.base import valid_emails
+                valid, invalid = valid_emails(formatted_row.get('email'))
+                if not valid:
+                    logger.warning('Skipping recipient with invalid email: %s',
+                                   formatted_row.get('email'))
+                    continue
+                formatted_row['email'] = valid[0]
 
                 if not BulkMessageRecipient.objects.filter(
                     email=formatted_row['email'],
