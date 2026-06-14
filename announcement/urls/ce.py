@@ -12,6 +12,7 @@ from ..views.views import (
     bulk_message_preview,
     bulk_message_delete_all_recipients,
     bulk_message_add_new,
+    bulk_message_use_report_as_datasource,
     bulk_message_delete,
     AnnouncementViewSet,
     BulkMessageViewSet, BulkMessageRecipientViewSet,
@@ -39,6 +40,7 @@ urlpatterns = [
 
     path('bulk_messages', bulk_messages, name='bulk_messages'),
     path('bulk_message/add_new', bulk_message_add_new, name='bulk_message_add_new'),
+    path('bulk_message/use_report_as_datasource', bulk_message_use_report_as_datasource, name='bulk_message_use_report_as_datasource'),
     path('bulk_message/get_datasource_filters', bulk_message_get_datasource_filters, name='get_datasource_filters'),
     path('bulk_message/<uuid:record_id>', bulk_message, name='bulk_message'),
     path('bulk_message/preview/<uuid:record_id>', bulk_message_preview, name='bulk_message_preview'),

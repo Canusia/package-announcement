@@ -292,6 +292,34 @@ def bulk_message_get_datasource_filters(request):
 
 
 @user_passes_test(user_has_cis_role, login_url='/')
+def bulk_message_use_report_as_datasource(request):
+    """Create a BulkMessage backed by a report datasource, carrying the report's
+    submitted filters (as lists), then redirect to its compose page."""
+    report_id = request.POST.get('report_id')
+    title = request.POST.get('title') or 'Bulk Message from Report'
+
+    skip = {'report_id', 'title', 'csrfmiddlewaretoken', 'action', 'submit'}
+    filt = {}
+    for key in request.POST:
+        if key in skip:
+            continue
+        filt[key] = request.POST.getlist(key)   # LIST values — required by get_recipients
+
+    record = BulkMessage(title=title, createdby=request.user)
+    record.datasource = {'name': f'report:{report_id}', 'filter': filt}
+    record.meta = {}
+    record.send_summary = {}
+    record.save()
+
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Created bulk message from report.',
+        'redirect_to': str(record.ce_url),
+        'action': 'redirect_to',
+    })
+
+
+@user_passes_test(user_has_cis_role, login_url='/')
 def bulk_message_add_new(request):
     if request.method == 'POST':
         """
