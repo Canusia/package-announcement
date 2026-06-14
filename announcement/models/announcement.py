@@ -7,7 +7,6 @@ from django.db import models, IntegrityError
 from django.dispatch import receiver
 from multiselectfield import MultiSelectField
 from django.urls import reverse_lazy
-from django.utils.module_loading import import_string
 from django.utils.safestring import mark_safe
 
 from django.template.loader import get_template, render_to_string
@@ -456,16 +455,8 @@ class BulkMessage(models.Model):
     
     @classmethod
     def get_datasource_object(cls, datasource_name):
-        path = 'announcement.datasources'
-        try:
-            if getattr(settings, 'DEBUG', False):
-                ds_class = import_string(f'announcement.{path}.{datasource_name}.{datasource_name}_DS')
-            else:
-                ds_class = import_string(f'{path}.{datasource_name}.{datasource_name}_DS')
-            return ds_class()
-        except ImportError:
-            print('failed to import datasource')
-            return None
+        from announcement.announcement.datasources.registry import bmailer_datasources
+        return bmailer_datasources.get(datasource_name)
 
     def is_from_datasource(self):
         return True if self.datasource['name'] != 'file_upload' else False

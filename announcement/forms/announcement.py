@@ -17,7 +17,6 @@ from cis.models.customuser import CustomUser
 
 from cis.utils import YES_NO_OPTIONS
 from ..models.announcement import Announcement, BulkMessage
-from ..apps import BMAILER_DS
 
 def format_cols(columns):
     result = {}
@@ -225,7 +224,7 @@ class BulkMessageInitForm(forms.Form):
     )
     
     datasource = forms.ChoiceField(
-        choices=BMAILER_DS
+        choices=[]
     )
 
     file = forms.FileField(
@@ -267,6 +266,12 @@ class BulkMessageInitForm(forms.Form):
 
     def __init__(self, request, record=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        import announcement.announcement.datasources  # noqa: F401 (ensure datasources registered)
+        from announcement.announcement.datasources.registry import bmailer_datasources
+        self.fields['datasource'].choices = (
+            [('file_upload', 'File Upload')] + bmailer_datasources.choices()
+        )
 
         self.request = request
 
