@@ -36,6 +36,10 @@ class MyCE_BMailerForm(forms.Form):
 
 class MyCE_BMailerDS:
 
+    # Recipient contract (enforced by DataSourceRegistry at registration).
+    email_column = 'email'
+    name_columns = ['FirstName', 'LastName']
+
     def description(self) -> str:
         """
         Return a textual description of the datasource
