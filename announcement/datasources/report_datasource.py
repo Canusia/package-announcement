@@ -49,6 +49,16 @@ class ReportDataSource(MyCE_BMailerDS):
     def description(self):
         return f'<p>{self.short_descriptor()}</p>'
 
+    def recipients_summary(self, filters=None):
+        from django.utils.safestring import mark_safe
+        filters = filters or {}
+        summary = mark_safe(self.description())
+        count = self.data_source(filters, count=True)
+        summary += f"<p class='alert alert-info'>Found {count} recipient(s) from report '{self.title()}'.</p>"
+        summary += "<h4>Customize Recipients</h4><hr>"
+        summary += self.data_filter(form_type='full', initial=filters)
+        return summary
+
     def data_filter(self, form_type='skinny', initial=None):
         if initial:
             form = self.form_class(initial=initial)

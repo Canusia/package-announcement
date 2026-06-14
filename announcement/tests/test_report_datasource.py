@@ -48,3 +48,11 @@ class ReportDataSourceTests(TestCase):
         ds = ReportDataSource(str(self.report.id))
         self.assertEqual(ds.title(), 'Teacher Course Certificates')
         self.assertTrue(ds.short_descriptor())
+
+    def test_recipients_summary_is_generic_not_teacher_worded(self):
+        ds = ReportDataSource(str(self.report.id))
+        html = ds.recipients_summary({'certificate_status': ['Teaching'], 'highschools': []})
+        self.assertIn('recipient', html.lower())
+        self.assertNotIn('teacher recipients', html.lower())
+        # shows the count (1 recipient from setUp)
+        self.assertIn('1', html)
