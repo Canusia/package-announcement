@@ -267,8 +267,7 @@ class BulkMessageInitForm(forms.Form):
     def __init__(self, request, record=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        import announcement.announcement.datasources  # noqa: F401 (ensure datasources registered)
-        from announcement.announcement.datasources.registry import bmailer_datasources
+        from ..datasources.registry import bmailer_datasources
         self.fields['datasource'].choices = (
             [('file_upload', 'File Upload')] + bmailer_datasources.choices()
         )

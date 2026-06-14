@@ -455,7 +455,7 @@ class BulkMessage(models.Model):
     
     @classmethod
     def get_datasource_object(cls, datasource_name):
-        from announcement.announcement.datasources.registry import bmailer_datasources
+        from ..datasources.registry import bmailer_datasources
         return bmailer_datasources.get(datasource_name)
 
     def is_from_datasource(self):
