@@ -12,10 +12,17 @@ from crispy_forms.layout import Submit
 from cis.models.teacher import Teacher
 
 from .base import MyCE_BMailerDS, MyCE_BMailerForm
+from .registry import bmailer_datasources
 
 from cis.models.highschool_administrator import HSPosition, HSAdministratorPosition
 
+
+@bmailer_datasources.register(
+    slug='highschool_admins', title='High School Administrators',
+    descriptor='School administrators, filtered by role and status.')
 class highschool_admins_DS(MyCE_BMailerDS):
+    email_column = 'email'
+    name_columns = ['FirstName', 'LastName']
 
     def data_columns(self) -> dict:
         """

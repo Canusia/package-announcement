@@ -16,10 +16,18 @@ from cis.models.highschool_administrator import HSAdministrator, HSAdministrator
 from cis.models.teacher import Teacher
 
 from .base import MyCE_BMailerDS, MyCE_BMailerForm
+from .registry import bmailer_datasources
 
 from cis.models.highschool_administrator import HSPosition, HSAdministratorPosition
 
+
+@bmailer_datasources.register(
+    slug='registration_summary_highschools',
+    title='Registration Summary - For High Schools',
+    descriptor='Per-high-school registration summary stats and counts.')
 class registration_summary_highschools_DS(MyCE_BMailerDS):
+    email_column = 'email'
+    name_columns = ['FirstName', 'LastName']
 
     def title(self) -> str:
         """
