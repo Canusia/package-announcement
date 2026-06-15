@@ -78,3 +78,11 @@ class ReportDataSource(MyCE_BMailerDS):
         if count:
             return len(rows)
         return rows
+
+    def sample_row(self):
+        """Preview uses the report's own sample row (so report shortcodes show);
+        falls back to the base demo row if the report doesn't define one."""
+        form = self.form_class()
+        if hasattr(form, 'sample_row'):
+            return form.sample_row()
+        return super().sample_row()
