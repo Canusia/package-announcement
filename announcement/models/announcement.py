@@ -36,7 +36,26 @@ def applies_to_choices():
             (role_id, role['nice_name'])
         )
     return result
-    
+
+
+class RoleMultiSelectField(MultiSelectField):
+    """MultiSelectField whose choices are built per-tenant at runtime from
+    settings.MY_CE roles.
+
+    Drop ``choices`` from ``deconstruct()`` so the dynamic, tenant-specific role
+    labels are never serialized into migrations — otherwise every tenant
+    generates a spurious AlterField carrying its own labels (and choices have no
+    effect on the DB schema anyway). Also force the base ``multiselectfield``
+    import path so the migration does not depend on this package's install
+    layout (``announcement`` flat vs ``announcement.announcement`` editable).
+    """
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        kwargs.pop('choices', None)
+        path = 'multiselectfield.db.fields.MultiSelectField'
+        return name, path, args, kwargs
+
 class Announcement(models.Model):
     """
     model
@@ -57,7 +76,7 @@ class Announcement(models.Model):
     ]
 
 
-    applies_to = MultiSelectField(
+    applies_to = RoleMultiSelectField(
         max_length=300,
         choices=lazy(applies_to_choices, list)()
     )
