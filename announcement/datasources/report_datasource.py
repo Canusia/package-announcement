@@ -55,15 +55,22 @@ class ReportDataSource(MyCE_BMailerDS):
         summary = mark_safe(self.description())
         count = self.data_source(filters, count=True)
         summary += f"<p class='alert alert-info'>Found {count} recipient(s) from report '{self.title()}'.</p>"
-        summary += "<h4>Customize Recipients</h4><hr>"
+        summary += "<h4>Filters (set when the report was used as a datasource)</h4><hr>"
         summary += self.data_filter(form_type='full', initial=filters)
         return summary
 
     def data_filter(self, form_type='skinny', initial=None):
-        if initial:
-            form = self.form_class(initial=initial)
-        else:
-            form = self.form_class()
+        # Report datasources are display-only on the bulk-message page: the
+        # filters were fixed at handoff and this form does not post back. Render
+        # the report form read-only — disabled fields, no submit button, and no
+        # nested <form> (so nothing here can be submitted).
+        form = self.form_class(initial=initial) if initial else self.form_class()
+        for field in form.fields.values():
+            field.disabled = True
+        helper = getattr(form, 'helper', None)
+        if helper is not None:
+            helper.form_tag = False
+            helper.inputs = []
         return render_crispy_form(form)
 
     def data_source(self, filters, count=False):
