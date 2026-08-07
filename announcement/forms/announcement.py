@@ -394,7 +394,7 @@ class BulkMessageRecipientForm(BulkMessageInitForm, forms.Form):
         if commit:
             record.save()
 
-            record.import_recipients_from_file()
+            self.recipients_added = record.import_recipients_from_file() or 0
 
         return record
 

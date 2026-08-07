@@ -6,6 +6,39 @@ package) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases use CalVer: `YYYY.MAJOR.MINOR`.
 
+## [2026.3.1] — 2026-08-07
+
+Bugfix release: a recipient CSV upload could report success while importing
+nothing.
+
+### Fixed
+- **Silent zero-recipient upload.** `import_recipients_from_file` passed the
+  result of `get_uploaded_file` straight to `io.StringIO` without checking it.
+  When the file could not be read the call returned `None`, `csv.DictReader`
+  yielded no rows, and the view still answered
+  `"Successfully uploaded recipient file."` — so a whole list vanished with a
+  green message. The model now logs an error and returns `0`, the form records
+  the count on `recipients_added`, and the view reports
+  `"Successfully added N recipient(s)"` or fails with a 400 explaining that no
+  recipients could be read.
+
+  The underlying read failure is fixed in `cis.utils.get_uploaded_file`, which
+  decoded S3 objects as strict UTF-8 and discarded the entire file on the first
+  non-UTF-8 byte. A CSV exported from Excel on Windows (cp1252) hits this with a
+  single accented name. **Requires the corresponding `myce_cis` release** —
+  without it this package now surfaces the failure instead of hiding it, but the
+  upload still imports nothing.
+
+### Removed
+- Two leftover `print()` calls in `import_recipients_from_file` that dumped the
+  entire uploaded file and every parsed row — recipient names and email
+  addresses — into application logs on every import.
+
+### Tests
+- `tests/test_recipient_file_import.py` — covers a full import, preservation of
+  accented names, the unreadable-file path returning `0`, and re-importing the
+  same file adding nothing.
+
 ## [2026.3.0] — 2026-06-15
 
 Major release: the bulk mailer gains a pluggable datasource registry and the
@@ -76,6 +109,7 @@ ability to drive campaigns from any opted-in report.
 - Initial release: role-based announcements and the bulk mailer (template
   shortcodes, CRON scheduling, send tracking, CSV/datasource recipients).
 
+[2026.3.1]: https://github.com/Canusia/package-announcement/releases/tag/2026.3.1
 [2026.3.0]: https://github.com/Canusia/package-announcement/releases/tag/2026.3.0
 [2026.2.0]: https://github.com/Canusia/package-announcement/releases/tag/2026.2.0
 [2026.1.0]: https://github.com/Canusia/package-announcement/releases/tag/2026.1.0

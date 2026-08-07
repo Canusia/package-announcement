@@ -410,15 +410,17 @@ class BulkMessage(models.Model):
 
         if self.media:
             decoded_file = get_uploaded_file(self.media.name)
-            print(decoded_file)
-            
+
+            if not decoded_file:
+                logger.error(
+                    'Unable to read uploaded recipient file %s', self.media.name
+                )
+                return 0
+
             reader = csv.DictReader(io.StringIO(decoded_file))
-        
+
             added = 0
             for row in reader:
-
-                print(row)
-                        
                 formatted_row = {}
                 for k, v in row.items():
                     formatted_row[

@@ -445,9 +445,19 @@ def bulk_message(request, record_id):
             if form.is_valid():
                 record = form.save(request=request, record=record, commit=True)
 
+                added = getattr(form, 'recipients_added', 0)
+
+                if not added:
+                    return JsonResponse({
+                        'message': 'No recipients were added',
+                        'errors': 'No new recipients could be read from the uploaded file. '
+                                  'Check that it is a comma delimited CSV with an "email" '
+                                  'column and that the addresses are not already on this list.'
+                    }, status=400)
+
                 data = {
                     'status':'success',
-                    'message':'Successfully uploaded recipient file.',
+                    'message': f'Successfully added {added} recipient(s) from the uploaded file.',
                     'redirect_to': str(record.ce_url),
                     'action': 'redirect_to'
                 }
