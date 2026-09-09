@@ -434,7 +434,7 @@ class BulkMessage(models.Model):
             datasource_name = self.datasource['name']
             datasource = BulkMessage.get_datasource_object(datasource_name)
 
-            return datasource.sample_row()
+            return datasource.sample_row(self.datasource.get('filter'))
         else:
             recps = BulkMessageRecipient.objects.filter(
                 bulk_message=self
@@ -447,15 +447,18 @@ class BulkMessage(models.Model):
     
     @classmethod
     def get_datasource_object(cls, datasource_name):
-        path = 'announcement.datasources'
+        # The app ships in two layouts: installed flat as `announcement`, or
+        # used from a source checkout nested as `announcement.announcement`
+        # (see DevAnnouncementConfig). Derive the package from this module
+        # rather than guessing from settings.DEBUG, which is unrelated to how
+        # the package was installed.
+        app_package = __name__.rsplit('.', 2)[0]
+        path = f'{app_package}.datasources.{datasource_name}.{datasource_name}_DS'
         try:
-            if getattr(settings, 'DEBUG', False):
-                ds_class = import_string(f'announcement.{path}.{datasource_name}.{datasource_name}_DS')
-            else:
-                ds_class = import_string(f'{path}.{datasource_name}.{datasource_name}_DS')
+            ds_class = import_string(path)
             return ds_class()
         except ImportError:
-            print('failed to import datasource')
+            logger.exception('failed to import datasource %s', path)
             return None
 
     def is_from_datasource(self):

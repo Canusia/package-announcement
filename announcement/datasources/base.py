@@ -62,7 +62,7 @@ class MyCE_BMailerDS:
         }
 
     
-    def sample_row(self) -> dict:
+    def sample_row(self, filters=None) -> dict:
         """
         Returns a dict keyed on data_column values. This information is used when generating a preview.
         """

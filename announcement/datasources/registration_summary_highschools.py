@@ -127,10 +127,16 @@ class registration_summary_highschools_DS(MyCE_BMailerDS):
             "term": "Term",
         }
 
-    def sample_row(self) -> dict:
+    def sample_row(self, filters=None) -> dict:
         """
         Returns a dict keyed on data_column values. This information is used when generating a preview.
         """
+        # Term comes from the saved filter rather than the placeholder row, so
+        # a preview shows the registration term that was actually selected
+        term = Term.objects.filter(
+            id__in=(filters or {}).get('term') or []
+        ).order_by('-code').first()
+
         return {
             "FirstName": "John",
             "LastName": "Smith",
@@ -143,7 +149,7 @@ class registration_summary_highschools_DS(MyCE_BMailerDS):
             "CompleteApplication": "5",
             "MissingParentConsent": "5",
             # "TeacherID": "abcd-abc-adbcd-ancjd",
-            "Term": "Fall 2025",
+            "Term": str(term) if term else "Fall 2025",
         }
 
     def description(self) -> str:
@@ -158,15 +164,22 @@ class registration_summary_highschools_DS(MyCE_BMailerDS):
         """
         summary = mark_safe(self.description())
 
+        # a bulk message is created before its filter is saved, so `filters`
+        # can be empty or name a term that no longer exists
+        filters = filters or {}
         term = Term.objects.filter(
-            id__in=filters.get('term')
-        ).order_by('-code')
-        summary += f"<p class='alert alert-info''>Filtered by Registration Term - {term[0]}<br>"
-        
-        records_count = self.data_source(filters, count=True)
+            id__in=filters.get('term') or []
+        ).order_by('-code').first()
 
-        summary += "<br>Found " + str(records_count) + " high school administrators that meet the criteria."
-        summary += "</p>"
+        if term is None or not filters.get('role'):
+            summary += "<p class='alert alert-warning'>Select a registration term and position below to see the matching recipients.</p>"
+        else:
+            summary += f"<p class='alert alert-info''>Filtered by Registration Term - {term}<br>"
+
+            records_count = self.data_source(filters, count=True)
+
+            summary += "<br>Found " + str(records_count) + " high school administrators that meet the criteria."
+            summary += "</p>"
 
         summary += "<h4>Customize Recipients</h4><hr>"
         summary += self.data_filter(form_type='full', initial=filters)
