@@ -80,6 +80,42 @@ class ScheduleTests(_Base):
         self.assertEqual(self.message().due_send_date(at(11, 50)), DAY)
 
 
+class UpgradeAndRaceTests(_Base):
+    @override_settings(MYCE_CRON_INTERVAL=9)
+    def test_date_sent_by_an_older_release_is_not_resent(self):
+        from django.utils.timezone import make_aware
+        bm = self.message('10:05 AM')
+        # the old code wrote a run log but no sent_on_dates
+        BulkMessageLog.objects.create(bulk_message=bm, run_started_on=make_aware(at(10, 10)))
+        self.assertIsNone(bm.due_send_date(at(10, 40)))
+
+    @override_settings(MYCE_CRON_INTERVAL=9)
+    def test_stale_save_keeps_the_claim(self):
+        bm = self.message('10:01 AM')
+        stale = BulkMessage.objects.get(pk=bm.pk)  # CE has the edit page open
+        bm.claim_send_date(at(10, 10))
+        stale.meta['send_time'] = '10:01 AM'
+        stale.save()
+        stale.refresh_from_db()
+        self.assertEqual(stale.meta['sent_on_dates'], [DAY.isoformat()])
+        self.assertIsNone(stale.due_send_date(at(10, 20)))
+
+    @override_settings(MYCE_CRON_INTERVAL=9)
+    def test_handle_sends_a_due_message_once(self):
+        bm = self.message('10:01 AM')
+        claim = BulkMessage.claim_send_date  # the real claim, at a fixed time
+        with mock.patch.object(BulkMessage, 'send',
+                               return_value=('ok', {'success': [], 'fail': []})) as send, \
+                mock.patch.object(BulkMessageLog.log_file.field.storage, 'save',
+                                  return_value='log.json'), \
+                mock.patch.object(BulkMessage, 'claim_send_date', autospec=True,
+                                  side_effect=lambda m, now=None: claim(m, at(10, 10))):
+            send_bulk_mail.Command().handle()
+            send_bulk_mail.Command().handle()
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(BulkMessageLog.objects.filter(bulk_message=bm).count(), 1)
+
+
 class RunTests(_Base):
     def test_one_failing_message_does_not_stop_the_others(self):
         bad, good = self.message(), self.message()

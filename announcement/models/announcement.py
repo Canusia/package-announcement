@@ -155,6 +155,22 @@ class BulkMessage(models.Model):
         null=True
     )
 
+    def save(self, *args, **kwargs):
+        """Keep the stored sent_on_dates when saving a copy loaded before a
+        send was claimed (the edit forms save the whole meta dict)."""
+        from django.db import transaction
+
+        with transaction.atomic():
+            stored = BulkMessage.objects.select_for_update().filter(
+                pk=self.pk).values_list('meta', flat=True).first()
+            stored_sent = (stored or {}).get('sent_on_dates') if isinstance(stored, dict) else None
+            if stored_sent:
+                if not isinstance(self.meta, dict):
+                    self.meta = {}
+                self.meta['sent_on_dates'] = sorted(
+                    set(self.meta.get('sent_on_dates', [])) | set(stored_sent))
+            super().save(*args, **kwargs)
+
     def delete_me(self):
         self.bulkmessagerecipient_set.all().delete()
 
@@ -230,7 +246,7 @@ class BulkMessage(models.Model):
 
         now = now or datetime.datetime.now()
         grace = self._send_grace()
-        sent = set(self.meta.get('sent_on_dates', []))
+        sent = self._sent_dates()
 
         for d in send_dates_str.split(','):
             try:
@@ -243,6 +259,22 @@ class BulkMessage(models.Model):
             if send_dt <= now < send_dt + grace:
                 return send_date
         return None
+
+    def _sent_dates(self):
+        """ISO dates this message has been sent for.
+
+        Releases before 2026.3.2 kept no sent_on_dates, only BulkMessageLog
+        rows, so a date with a run log also counts as sent. Otherwise the
+        upgrade would resend anything sent within the grace period.
+        """
+        from django.db.models.functions import TruncDate
+
+        sent = set(self.meta.get('sent_on_dates', []))
+        logged = BulkMessageLog.objects.filter(
+            bulk_message_id=self.pk, run_started_on__isnull=False,
+        ).annotate(day=TruncDate('run_started_on')).values_list('day', flat=True)
+        sent.update(d.isoformat() for d in logged)
+        return sent
 
     def should_message_be_sent(self, now=None):
         return self.due_send_date(now) is not None
