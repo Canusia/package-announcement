@@ -11,8 +11,17 @@ from crispy_forms.layout import Submit
 
 from cis.models.teacher import Teacher
 
-from .base import MyCE_BMailerDS, MyCE_BMailerForm
+from .base import MyCE_BMailerDS, MyCE_BMailerForm, has_field
+from .registry import bmailer_datasources
 
 
+@bmailer_datasources.register(
+    slug='teachers', title='Teachers',
+    descriptor='High school teachers, filtered by status.')
 class teachers_DS(MyCE_BMailerDS):
-    ...
+    email_column = 'email'
+    name_columns = ['FirstName', 'LastName']
+
+    @classmethod
+    def is_available(cls) -> bool:
+        return has_field(Teacher, 'status') and hasattr(Teacher, 'STATUS_OPTIONS')

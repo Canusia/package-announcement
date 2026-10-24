@@ -7,7 +7,6 @@ from django.db import models, IntegrityError
 from django.dispatch import receiver
 from multiselectfield import MultiSelectField
 from django.urls import reverse_lazy
-from django.utils.module_loading import import_string
 from django.utils.safestring import mark_safe
 
 from django.template.loader import get_template, render_to_string
@@ -37,7 +36,26 @@ def applies_to_choices():
             (role_id, role['nice_name'])
         )
     return result
-    
+
+
+class RoleMultiSelectField(MultiSelectField):
+    """MultiSelectField whose choices are built per-tenant at runtime from
+    settings.MY_CE roles.
+
+    Drop ``choices`` from ``deconstruct()`` so the dynamic, tenant-specific role
+    labels are never serialized into migrations — otherwise every tenant
+    generates a spurious AlterField carrying its own labels (and choices have no
+    effect on the DB schema anyway). Also force the base ``multiselectfield``
+    import path so the migration does not depend on this package's install
+    layout (``announcement`` flat vs ``announcement.announcement`` editable).
+    """
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        kwargs.pop('choices', None)
+        path = 'multiselectfield.db.fields.MultiSelectField'
+        return name, path, args, kwargs
+
 class Announcement(models.Model):
     """
     model
@@ -58,7 +76,7 @@ class Announcement(models.Model):
     ]
 
 
-    applies_to = MultiSelectField(
+    applies_to = RoleMultiSelectField(
         max_length=300,
         choices=lazy(applies_to_choices, list)()
     )
@@ -137,6 +155,22 @@ class BulkMessage(models.Model):
         null=True
     )
 
+    def save(self, *args, **kwargs):
+        """Keep the stored sent_on_dates when saving a copy loaded before a
+        send was claimed (the edit forms save the whole meta dict)."""
+        from django.db import transaction
+
+        with transaction.atomic():
+            stored = BulkMessage.objects.select_for_update().filter(
+                pk=self.pk).values_list('meta', flat=True).first()
+            stored_sent = (stored or {}).get('sent_on_dates') if isinstance(stored, dict) else None
+            if stored_sent:
+                if not isinstance(self.meta, dict):
+                    self.meta = {}
+                self.meta['sent_on_dates'] = sorted(
+                    set(self.meta.get('sent_on_dates', [])) | set(stored_sent))
+            super().save(*args, **kwargs)
+
     def delete_me(self):
         self.bulkmessagerecipient_set.all().delete()
 
@@ -174,47 +208,94 @@ class BulkMessage(models.Model):
             return True
         return False
 
-    def should_message_be_sent(self):
+    def _send_grace(self):
+        """How long after its send time a message is still sent.
+
+        Wider than the cron interval, so a send time that falls between two
+        runs is picked up by the next one. MYCE_CRON_INTERVAL may arrive as a
+        string (os.getenv), so coerce it.
+        """
+        try:
+            interval = int(getattr(settings, 'MYCE_CRON_INTERVAL', 60))
+        except (TypeError, ValueError):
+            interval = 60
+        try:
+            grace = int(getattr(settings, 'BMAILER_SEND_GRACE_MINUTES', 60))
+        except (TypeError, ValueError):
+            grace = 60
+        return datetime.timedelta(minutes=max(grace, 2 * interval))
+
+    def due_send_date(self, now=None):
+        """The send date this message is due for now, or None.
+
+        Due when its send time on one of its send dates has passed, by no more
+        than the grace period, and it has not been sent for that date yet.
+        """
         if self.status != 'ready_to_send':
-            return False
+            return None
 
-        # Check if today is one of the selected send dates
         send_dates_str = self.meta.get('send_dates', '')
-        if not send_dates_str:
-            return False
-
-        today = datetime.date.today()
-        send_dates = [d.strip() for d in send_dates_str.split(',') if d.strip()]
-
-        date_match = False
-        for d in send_dates:
-            try:
-                parsed = datetime.datetime.strptime(d, '%m/%d/%Y').date()
-                if parsed == today:
-                    date_match = True
-                    break
-            except ValueError:
-                continue
-
-        if not date_match:
-            return False
-
-        # Check if current time is within the send window
         send_time_str = self.meta.get('send_time', '')
-        if not send_time_str:
-            return False
+        if not send_dates_str or not send_time_str:
+            return None
 
         try:
             send_time = datetime.datetime.strptime(send_time_str, '%I:%M %p').time()
         except ValueError:
-            return False
+            return None
 
-        now = datetime.datetime.now()
-        cron_interval = getattr(settings, 'MYCE_CRON_INTERVAL', 60)
-        window_start = now - datetime.timedelta(minutes=cron_interval)
+        now = now or datetime.datetime.now()
+        grace = self._send_grace()
+        sent = self._sent_dates()
 
-        send_dt = datetime.datetime.combine(today, send_time)
-        return window_start <= send_dt <= now
+        for d in send_dates_str.split(','):
+            try:
+                send_date = datetime.datetime.strptime(d.strip(), '%m/%d/%Y').date()
+            except ValueError:
+                continue
+            if send_date.isoformat() in sent:
+                continue
+            send_dt = datetime.datetime.combine(send_date, send_time)
+            if send_dt <= now < send_dt + grace:
+                return send_date
+        return None
+
+    def _sent_dates(self):
+        """ISO dates this message has been sent for.
+
+        Releases before 2026.3.2 kept no sent_on_dates, only BulkMessageLog
+        rows, so a date with a run log also counts as sent. Otherwise the
+        upgrade would resend anything sent within the grace period.
+        """
+        from django.db.models.functions import TruncDate
+
+        sent = set(self.meta.get('sent_on_dates', []))
+        logged = BulkMessageLog.objects.filter(
+            bulk_message_id=self.pk, run_started_on__isnull=False,
+        ).annotate(day=TruncDate('run_started_on')).values_list('day', flat=True)
+        sent.update(d.isoformat() for d in logged)
+        return sent
+
+    def should_message_be_sent(self, now=None):
+        return self.due_send_date(now) is not None
+
+    def claim_send_date(self, now=None):
+        """Record the due send date as sent and return it, or None if not due.
+
+        Claimed under a row lock before sending, so overlapping runs can't
+        send the same message twice for one date.
+        """
+        from django.db import transaction
+
+        with transaction.atomic():
+            locked = BulkMessage.objects.select_for_update().get(pk=self.pk)
+            send_date = locked.due_send_date(now)
+            if send_date is None:
+                return None
+            locked.meta.setdefault('sent_on_dates', []).append(send_date.isoformat())
+            locked.save(update_fields=['meta'])
+        self.meta = locked.meta
+        return send_date
 
     def tracking_url(self, recipient_id):
         from cis.utils import getDomain
@@ -274,7 +355,16 @@ class BulkMessage(models.Model):
                 if type(to) != list:
                     to = []
                     to.append(row['email'])
-                
+
+                from ..datasources.base import valid_emails
+                to, bad = valid_emails(to)
+                if bad:
+                    detailed_log.setdefault('invalid', []).extend(bad)
+                if not to:
+                    detailed_log.setdefault('skipped', []).append(
+                        row.get(datasource.name_columns[0], '') if isinstance(row, dict) else '')
+                    continue
+
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
@@ -321,7 +411,14 @@ class BulkMessage(models.Model):
                 if type(to) != list:
                     to = list()
                     to.append(row.email)
-                
+
+                from ..datasources.base import valid_emails
+                to, bad = valid_emails(to)
+                if bad:
+                    detailed_log.setdefault('invalid', []).extend(bad)
+                if not to:
+                    continue
+
                 for t in to:
                     detailed_log['success'].append({
                         t: text_body
@@ -376,20 +473,30 @@ class BulkMessage(models.Model):
 
         if self.media:
             decoded_file = get_uploaded_file(self.media.name)
-            print(decoded_file)
-            
+
+            if not decoded_file:
+                logger.error(
+                    'Unable to read uploaded recipient file %s', self.media.name
+                )
+                return 0
+
             reader = csv.DictReader(io.StringIO(decoded_file))
-        
+
             added = 0
             for row in reader:
-
-                print(row)
-                        
                 formatted_row = {}
                 for k, v in row.items():
                     formatted_row[
                         formatted_cols.get(k)
                     ] = v
+
+                from ..datasources.base import valid_emails
+                valid, invalid = valid_emails(formatted_row.get('email'))
+                if not valid:
+                    logger.warning('Skipping recipient with invalid email: %s',
+                                   formatted_row.get('email'))
+                    continue
+                formatted_row['email'] = valid[0]
 
                 if not BulkMessageRecipient.objects.filter(
                     email=formatted_row['email'],
@@ -456,16 +563,8 @@ class BulkMessage(models.Model):
     
     @classmethod
     def get_datasource_object(cls, datasource_name):
-        path = 'announcement.datasources'
-        try:
-            if getattr(settings, 'DEBUG', False):
-                ds_class = import_string(f'announcement.{path}.{datasource_name}.{datasource_name}_DS')
-            else:
-                ds_class = import_string(f'{path}.{datasource_name}.{datasource_name}_DS')
-            return ds_class()
-        except ImportError:
-            print('failed to import datasource')
-            return None
+        from ..datasources.registry import bmailer_datasources
+        return bmailer_datasources.get(datasource_name)
 
     def is_from_datasource(self):
         return True if self.datasource['name'] != 'file_upload' else False

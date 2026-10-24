@@ -1,49 +1,59 @@
 import logging, datetime, json
-from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
 from django.utils.timezone import make_aware
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-from django.utils import timezone
-from django.core.files.base import ContentFile, File
+from django.core.files.base import ContentFile
 
 from ...models.announcement import BulkMessage, BulkMessageLog
-# from ..models.announcement import BulkMessage, BulkMessageLog
+
+
 class Command(BaseCommand):
     '''
-    Daily jobs
+    Send the 'ready to send' bulk messages that are due.
+
+    Each message is sent on its own: one that fails is logged and the run
+    moves on to the next.
     '''
     help = ''
 
     def handle(self, *args, **kwargs):
-        # get all 'ready to send' messages
-
         ready_messages = BulkMessage.objects.filter(
             status='ready_to_send'
         )
-        
+
         for bm in ready_messages:
-            # check if they are ready to send in current run window
-            if bm.should_message_be_sent():
-                log = BulkMessageLog(
-                    bulk_message=bm,
-                    run_started_on=make_aware(datetime.datetime.now())
-                )
-                
-                # send message
-                summary, detailed_log = bm.send()
-                log.run_completed_on = make_aware(datetime.datetime.now())
+            try:
+                self.send_one(bm)
+            except Exception:
+                logger.exception('Bulk message %s (%s) failed to send', bm.pk, bm)
 
-                log.meta = {}
-                log.meta['summary'] = summary
+    def send_one(self, bm):
+        # claimed before sending, so a failed send is not retried for that date
+        send_date = bm.claim_send_date()
+        if send_date is None:
+            return
 
-                log.log_file.save('log.json', ContentFile(
-                    json.dumps(detailed_log).encode())
-                )
+        log = BulkMessageLog(
+            bulk_message=bm,
+            run_started_on=make_aware(datetime.datetime.now())
+        )
 
-                log.save()
-            else:
-                print(f'{bm} no need to send now')
+        try:
+            summary, detailed_log = bm.send()
+        except Exception as e:
+            log.run_completed_on = make_aware(datetime.datetime.now())
+            log.meta = {'summary': f'<br>Send for {send_date:%m/%d/%Y} failed - {e}'}
+            log.save()
+            raise
+
+        log.run_completed_on = make_aware(datetime.datetime.now())
+        log.meta = {'summary': summary}
+
+        log.log_file.save('log.json', ContentFile(
+            json.dumps(detailed_log).encode())
+        )
+
+        log.save()
