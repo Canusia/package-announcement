@@ -6,6 +6,30 @@ package) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases use CalVer: `YYYY.MAJOR.MINOR`.
 
+## [2026.3.2] — 2026-10-24
+
+Bulk mailer reliability (#4) and version metadata (#3).
+
+### Fixed
+- Scheduled messages whose send time fell between two cron runs were never sent.
+  A message is now due for `max(BMAILER_SEND_GRACE_MINUTES, 2 × MYCE_CRON_INTERVAL)`
+  minutes after its send time, and each date is claimed once (`meta['sent_on_dates']`,
+  plus send logs from older releases).
+- One failing message no longer stops the rest of `send_bulk_mail`.
+- `get_announcements()` filters on the portal's role with whole-value matching
+  (`teacher` → `instructor`); no 500 for users with no groups.
+- Built-in datasources hide themselves when the tenant's cis schema lacks what they need.
+- Registration Summary filter without `test_email`; 405 instead of 500 on GET to the add-new views.
+- Package version now matches the tag.
+
+### Added
+- `BMAILER_DISABLED_DATASOURCES`, `DataSourceRegistry.unregister()`, `MyCE_BMailerDS.is_available()`,
+  `BMAILER_SEND_GRACE_MINUTES`.
+
+### Changed
+- Announcements aimed only at roles without a portal page no longer show anywhere; a failed
+  or interrupted send is not retried for that date.
+
 ## [2026.3.1] — 2026-08-07
 
 Bugfix release: a recipient CSV upload could report success while importing
