@@ -192,47 +192,78 @@ class BulkMessage(models.Model):
             return True
         return False
 
-    def should_message_be_sent(self):
+    def _send_grace(self):
+        """How long after its send time a message is still sent.
+
+        Wider than the cron interval, so a send time that falls between two
+        runs is picked up by the next one. MYCE_CRON_INTERVAL may arrive as a
+        string (os.getenv), so coerce it.
+        """
+        try:
+            interval = int(getattr(settings, 'MYCE_CRON_INTERVAL', 60))
+        except (TypeError, ValueError):
+            interval = 60
+        try:
+            grace = int(getattr(settings, 'BMAILER_SEND_GRACE_MINUTES', 60))
+        except (TypeError, ValueError):
+            grace = 60
+        return datetime.timedelta(minutes=max(grace, 2 * interval))
+
+    def due_send_date(self, now=None):
+        """The send date this message is due for now, or None.
+
+        Due when its send time on one of its send dates has passed, by no more
+        than the grace period, and it has not been sent for that date yet.
+        """
         if self.status != 'ready_to_send':
-            return False
+            return None
 
-        # Check if today is one of the selected send dates
         send_dates_str = self.meta.get('send_dates', '')
-        if not send_dates_str:
-            return False
-
-        today = datetime.date.today()
-        send_dates = [d.strip() for d in send_dates_str.split(',') if d.strip()]
-
-        date_match = False
-        for d in send_dates:
-            try:
-                parsed = datetime.datetime.strptime(d, '%m/%d/%Y').date()
-                if parsed == today:
-                    date_match = True
-                    break
-            except ValueError:
-                continue
-
-        if not date_match:
-            return False
-
-        # Check if current time is within the send window
         send_time_str = self.meta.get('send_time', '')
-        if not send_time_str:
-            return False
+        if not send_dates_str or not send_time_str:
+            return None
 
         try:
             send_time = datetime.datetime.strptime(send_time_str, '%I:%M %p').time()
         except ValueError:
-            return False
+            return None
 
-        now = datetime.datetime.now()
-        cron_interval = getattr(settings, 'MYCE_CRON_INTERVAL', 60)
-        window_start = now - datetime.timedelta(minutes=cron_interval)
+        now = now or datetime.datetime.now()
+        grace = self._send_grace()
+        sent = set(self.meta.get('sent_on_dates', []))
 
-        send_dt = datetime.datetime.combine(today, send_time)
-        return window_start <= send_dt <= now
+        for d in send_dates_str.split(','):
+            try:
+                send_date = datetime.datetime.strptime(d.strip(), '%m/%d/%Y').date()
+            except ValueError:
+                continue
+            if send_date.isoformat() in sent:
+                continue
+            send_dt = datetime.datetime.combine(send_date, send_time)
+            if send_dt <= now < send_dt + grace:
+                return send_date
+        return None
+
+    def should_message_be_sent(self, now=None):
+        return self.due_send_date(now) is not None
+
+    def claim_send_date(self, now=None):
+        """Record the due send date as sent and return it, or None if not due.
+
+        Claimed under a row lock before sending, so overlapping runs can't
+        send the same message twice for one date.
+        """
+        from django.db import transaction
+
+        with transaction.atomic():
+            locked = BulkMessage.objects.select_for_update().get(pk=self.pk)
+            send_date = locked.due_send_date(now)
+            if send_date is None:
+                return None
+            locked.meta.setdefault('sent_on_dates', []).append(send_date.isoformat())
+            locked.save(update_fields=['meta'])
+        self.meta = locked.meta
+        return send_date
 
     def tracking_url(self, recipient_id):
         from cis.utils import getDomain

@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 
@@ -53,9 +54,24 @@ class DataSourceRegistry:
                 f"Datasource '{slug}' name_columns {missing} are not in "
                 f"data_columns() values.")
 
+    def unregister(self, slug):
+        """Remove ``slug``; a no-op if it isn't registered."""
+        self._datasources.pop(slug, None)
+
+    def is_enabled(self, slug):
+        """False when the tenant lists ``slug`` in BMAILER_DISABLED_DATASOURCES,
+        or the datasource reports this tenant's schema can't support it."""
+        entry = self._datasources.get(slug)
+        if not entry:
+            return False
+        if slug in getattr(settings, 'BMAILER_DISABLED_DATASOURCES', ()):
+            return False
+        return entry['class'].is_available()
+
     def choices(self):
-        """[(slug, title)] for the datasource dropdown."""
-        return [(slug, e['title']) for slug, e in self._datasources.items()]
+        """[(slug, title)] of the enabled datasources, for the dropdown."""
+        return [(slug, e['title']) for slug, e in self._datasources.items()
+                if self.is_enabled(slug)]
 
     def get(self, slug):
         """Return an instance for ``slug``, or None.

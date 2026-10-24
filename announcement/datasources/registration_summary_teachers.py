@@ -13,7 +13,7 @@ from cis.models.section import StudentRegistration, ClassSection
 from cis.models.term import Term
 from cis.models.teacher import Teacher
 
-from .base import MyCE_BMailerDS, MyCE_BMailerForm
+from .base import MyCE_BMailerDS, MyCE_BMailerForm, has_field
 from .registry import bmailer_datasources
 
 from cis.models.highschool_administrator import HSPosition, HSAdministratorPosition
@@ -26,6 +26,10 @@ from cis.models.highschool_administrator import HSPosition, HSAdministratorPosit
 class registration_summary_teachers_DS(MyCE_BMailerDS):
     email_column = 'email'
     name_columns = ['TeacherFirstName', 'TeacherLastName']
+
+    @classmethod
+    def is_available(cls) -> bool:
+        return has_field(ClassSection, 'registration_term') and hasattr(Teacher, 'sections_summary')
 
     def title(self) -> str:
         """
@@ -134,7 +138,10 @@ class registration_summary_teachers_DS(MyCE_BMailerDS):
         if initial:
             form.fields['ds_term'].initial = initial.get('term')
             form.fields['ds_mode'].initial = initial.get('mode')
-            form.fields['ds_test_email'].initial = initial.get('test_email', [])[0]
+            test_email = initial.get('test_email') or ''
+            if isinstance(test_email, list):
+                test_email = test_email[0] if test_email else ''
+            form.fields['ds_test_email'].initial = test_email
 
         template = 'announcements/datasource-form.html'
         template = get_template(template)

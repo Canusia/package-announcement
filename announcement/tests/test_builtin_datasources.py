@@ -6,7 +6,7 @@ import announcement.announcement.datasources  # noqa: F401  (triggers registrati
 
 class BuiltinDatasourceRegistrationTests(SimpleTestCase):
     def test_all_builtins_registered_with_descriptor(self):
-        slugs = dict(bmailer_datasources.choices())
+        slugs = bmailer_datasources._datasources  # registered, enabled or not
         for slug in ('teachers', 'highschool_admins',
                      'registration_summary_teachers',
                      'registration_summary_highschools'):

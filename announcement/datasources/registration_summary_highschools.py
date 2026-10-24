@@ -15,7 +15,7 @@ from cis.models.highschool import HighSchool
 from cis.models.highschool_administrator import HSAdministrator, HSAdministratorPosition
 from cis.models.teacher import Teacher
 
-from .base import MyCE_BMailerDS, MyCE_BMailerForm
+from .base import MyCE_BMailerDS, MyCE_BMailerForm, has_field
 from .registry import bmailer_datasources
 
 from cis.models.highschool_administrator import HSPosition, HSAdministratorPosition
@@ -28,6 +28,10 @@ from cis.models.highschool_administrator import HSPosition, HSAdministratorPosit
 class registration_summary_highschools_DS(MyCE_BMailerDS):
     email_column = 'email'
     name_columns = ['FirstName', 'LastName']
+
+    @classmethod
+    def is_available(cls) -> bool:
+        return has_field(ClassSection, 'registration_term') and hasattr(HighSchool, 'sections_summary')
 
     def title(self) -> str:
         """

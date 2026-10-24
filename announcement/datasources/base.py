@@ -31,6 +31,14 @@ def valid_emails(addresses):
             invalid.append(addr)
     return valid, invalid
 
+def has_field(model, name):
+    """True if ``model`` has a field called ``name``."""
+    try:
+        model._meta.get_field(name)
+    except Exception:  # FieldDoesNotExist
+        return False
+    return True
+
 class MyCE_BMailerForm(forms.Form):
     
     def __init__(self, form_type='skiny', datasource_name='', *args, **kwargs):
@@ -59,6 +67,14 @@ class MyCE_BMailerDS:
     # Recipient contract (enforced by DataSourceRegistry at registration).
     email_column = 'email'
     name_columns = ['FirstName', 'LastName']
+
+    @classmethod
+    def is_available(cls) -> bool:
+        """
+        False when this tenant's models lack what the datasource needs. It is
+        then left out of the datasource dropdown.
+        """
+        return True
 
     def description(self) -> str:
         """

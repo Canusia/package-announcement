@@ -44,6 +44,10 @@ class my_ds_DS(MyCE_BMailerDS):
   `ImproperlyConfigured` if `email_column`/`name_columns` aren't in `data_columns()` values.
 - The datasource dropdown is built dynamically from `bmailer_datasources.choices()`
   (plus a static `file_upload` entry). `BMAILER_DS` is retired.
+- **Opting out:** `choices()` lists only enabled datasources. A tenant disables one with
+  `BMAILER_DISABLED_DATASOURCES = ['slug', ...]` or `bmailer_datasources.unregister(slug)`;
+  a datasource whose `is_available()` classmethod returns False (built-ins check for the
+  cis fields/methods they need, e.g. `sections_summary`) is hidden automatically.
 - **Internal datasource/model/form code must use RELATIVE imports** (`from .registry`,
   `from ..datasources.base`) so it works whether the package is installed flat as
   `announcement` (prod) or nested as `announcement.announcement` (dev).
@@ -74,6 +78,12 @@ guards both queue insertion points (`BulkMessage.import_recipients_from_file` an
 3. Set CRON schedule and send window
 4. Mark as `ready_to_send`
 5. `send_bulk_mail` management command processes scheduled messages
+
+**Scheduling:** a message is due once its `send_time` on a `send_dates` entry has passed,
+for up to `max(BMAILER_SEND_GRACE_MINUTES (60), 2 × MYCE_CRON_INTERVAL)` minutes.
+`claim_send_date()` records the date in `meta['sent_on_dates']` under a row lock
+before sending, so each date sends once (a send that fails is not retried). Each
+message is sent in its own `try`, so one failure doesn't stop the run.
 
 **Template Variables:** Shortcodes map to datasource columns or CSV headers. Use `{{column_name}}` syntax.
 

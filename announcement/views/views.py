@@ -9,7 +9,7 @@ from django.template.context_processors import csrf
 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseNotAllowed
 
 from cis.models.settings import Setting
 from cis.utils import (
@@ -121,38 +121,31 @@ def show_announcements_for_students(request):
 def show_announcements_for_highschool_admin(request):
     return get_announcements(request, 'highschool_admin')
 
-def get_announcements(request, user_role='student'):
+# Portal names that differ from the MY_CE role key stored in applies_to.
+ROLE_ALIASES = {
+    'teacher': 'instructor',
+}
 
-    from django.db.models import Q
-    from functools import reduce
-    import operator
+
+def get_announcements(request, user_role='student'):
+    """Active announcements for the portal's role.
+
+    Only the role the portal passes in counts, so a user with several roles
+    sees each portal's own announcements there. applies_to is a
+    comma-separated list, so match whole values, not substrings.
+    """
+    import re
     from datetime import datetime
 
+    role = ROLE_ALIASES.get(user_role, user_role)
+
     announcements = Announcement.objects.filter(
-        # applies_to__contains=applies_to,
         valid_from__lte=datetime.now(),
-        valid_until__gte=datetime.now()
+        valid_until__gte=datetime.now(),
+        applies_to__regex=rf'(^|,){re.escape(role)}(,|$)',
     )
-    if request:
-        roles = request.user.get_roles()
 
-        query = reduce(operator.or_, (Q(applies_to__contains=role) for role in roles))
-        announcements = announcements.filter(
-            query
-        )
-
-    # if user_role == 'student':
-    #     applies_to = 'Students'
-    # elif user_role == 'highschool_admin':
-    #     applies_to = 'High School Administrators'
-    # elif user_role == 'teacher':
-    #     applies_to = 'Instructors'
-    # elif user_role == 'faculty':
-    #     applies_to = 'Faculty'
-
-    announcements = announcements.order_by('display_weight')
-
-    return announcements
+    return announcements.order_by('display_weight')
 
 @user_passes_test(user_has_cis_role, login_url='/')
 def delete(request, record_id):
@@ -272,6 +265,13 @@ def add_new(request):
             }
             return JsonResponse(data)
 
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Unknown action.'
+        }, status=400)
+
+    return HttpResponseNotAllowed(['POST'])
+
 
 @user_passes_test(user_has_cis_role, login_url='/')
 def bulk_message_get_datasource_filters(request):
@@ -344,6 +344,8 @@ def bulk_message_add_new(request):
                 'message': 'Please correct the errors and try again',
                 'errors': form.errors.as_json()
             }, status=400)
+
+    return HttpResponseNotAllowed(['POST'])
 
 
 @user_passes_test(user_has_cis_role, login_url='/')
