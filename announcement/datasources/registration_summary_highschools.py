@@ -15,7 +15,7 @@ from cis.models.highschool import HighSchool
 from cis.models.highschool_administrator import HSAdministrator, HSAdministratorPosition
 from cis.models.teacher import Teacher
 
-from .base import MyCE_BMailerDS, MyCE_BMailerForm, has_field
+from .base import MyCE_BMailerDS, MyCE_BMailerForm, has_field, sections_in_terms
 from .registry import bmailer_datasources
 
 from cis.models.highschool_administrator import HSPosition, HSAdministratorPosition
@@ -31,7 +31,7 @@ class registration_summary_highschools_DS(MyCE_BMailerDS):
 
     @classmethod
     def is_available(cls) -> bool:
-        return has_field(ClassSection, 'registration_term') and hasattr(HighSchool, 'sections_summary')
+        return has_field(ClassSection, 'term') and hasattr(HighSchool, 'sections_summary')
 
     def title(self) -> str:
         """
@@ -80,9 +80,7 @@ class registration_summary_highschools_DS(MyCE_BMailerDS):
         """
         result = []
 
-        sections = ClassSection.objects.filter(
-            registration_term__id__in=filters.get('term')
-        )
+        sections = sections_in_terms(filters.get('term'))
 
         records = HSAdministratorPosition.objects.filter(
             highschool__id__in=sections.values('highschool__id'),

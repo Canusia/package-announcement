@@ -39,6 +39,21 @@ def has_field(model, name):
         return False
     return True
 
+def sections_in_terms(term_ids):
+    """ClassSections whose term is one of ``term_ids`` or a sub-term of one.
+
+    A section has a single ``term``; its parent term stands in for the
+    registration term, so picking a parent includes its sub-terms. Older cis
+    releases lack ``expand_term_ids``; there the ids are matched as given.
+    """
+    from cis.models.section import ClassSection
+    try:
+        from cis.services.term_hierarchy import expand_term_ids
+    except ImportError:
+        return ClassSection.objects.filter(term__id__in=term_ids or [])
+    return ClassSection.objects.filter(term__id__in=expand_term_ids(term_ids or []))
+
+
 class MyCE_BMailerForm(forms.Form):
     
     def __init__(self, form_type='skiny', datasource_name='', *args, **kwargs):
