@@ -6,6 +6,16 @@ package) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Releases use CalVer: `YYYY.MAJOR.MINOR`.
 
+## [2026.3.3] — 2026-10-30
+
+Registration summaries by parent term (package-cis registration_term retirement).
+
+### Fixed
+- The high-school and teacher registration summary data sources include sections on
+  the selected term's sub-terms and pass the whole term tree to `sections_summary`;
+  they no longer depend on `ClassSection.registration_term`. On a cis without
+  `expand_term_ids` they filter on the selected terms only.
+
 ## [2026.3.2] — 2026-10-24
 
 Bulk mailer reliability (#4) and version metadata (#3).
