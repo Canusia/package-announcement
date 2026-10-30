@@ -3,7 +3,12 @@
 A section has one `term`; the registration term is its parent. Filtering by a
 parent term must therefore include sections on its sub-terms.
 """
+from unittest.mock import patch
+
 from django.test import TestCase
+
+from cis.models.highschool import HighSchool
+from cis.models.section import ClassSection
 
 from cis.models.highschool_administrator import (
     HSAdministrator, HSAdministratorPosition, HSPosition)
@@ -51,3 +56,45 @@ class RegistrationSummaryTermTreeTests(TermTreeFixtureMixin, TestCase):
         filters = {'term': [str(self.quarter.id)],
                    'role': [str(self.position.id)]}
         self.assertEqual(ds.data_source(filters, count=True), 1)
+
+
+class SummaryTermsPassedTests(TermTreeFixtureMixin, TestCase):
+    """sections_summary gets the picked term plus sub-terms; merge field is the pick."""
+
+    def _empty_summary(self):
+        from django.db.models import QuerySet
+        none = ClassSection.objects.none()
+        return (none, none, none, none, 0, 0)
+
+    def _user(self):
+        from django.contrib.auth import get_user_model
+        return get_user_model().objects.create_user(
+            username=f'u_{sfx()}', email=f'u_{sfx()}@x.com', password='x')
+
+    def test_teachers_receive_expanded_terms_and_row_uses_picked(self):
+        teacher = Teacher.objects.create(user=self._user())
+        section = self.sections['Fall Semester']
+        section.teacher = teacher
+        section.save()
+        with patch.object(Teacher, 'sections_summary', create=True,
+                          return_value=self._empty_summary()) as m:
+            rows = registration_summary_teachers_DS().data_source(
+                {'term': [str(self.quarter.id)], 'mode': ['live']})
+        passed = {t.id for t in m.call_args.kwargs['terms']}
+        self.assertEqual(passed, {self.quarter.id, self.semester.id, self.trimester.id})
+        self.assertEqual(rows[0]['TermID'], str(self.quarter.id))
+        self.assertEqual(rows[0]['Term'], str(self.quarter))
+
+    def test_highschools_receive_expanded_terms_and_row_uses_picked(self):
+        position = HSPosition.objects.create(name=f'Pos-{sfx()}')
+        HSAdministratorPosition.objects.create(
+            hsadmin=HSAdministrator.objects.create(user=self._user()),
+            highschool=self.hs, position=position, status='active')
+        self.sections['Fall Semester']  # section on a sub-term, school = self.hs
+        with patch.object(HighSchool, 'sections_summary', create=True,
+                          return_value=self._empty_summary()) as m:
+            rows = registration_summary_highschools_DS().data_source(
+                {'term': [str(self.quarter.id)], 'role': [str(position.id)]})
+        passed = {t.id for t in m.call_args.kwargs['terms']}
+        self.assertEqual(passed, {self.quarter.id, self.semester.id, self.trimester.id})
+        self.assertEqual(rows[0]['TermID'], str(self.quarter.id))

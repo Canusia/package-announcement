@@ -15,7 +15,7 @@ from cis.models.highschool import HighSchool
 from cis.models.highschool_administrator import HSAdministrator, HSAdministratorPosition
 from cis.models.teacher import Teacher
 
-from .base import MyCE_BMailerDS, MyCE_BMailerForm, has_field, sections_in_terms
+from .base import MyCE_BMailerDS, MyCE_BMailerForm, has_field, sections_in_terms, summary_terms
 from .registry import bmailer_datasources
 
 from cis.models.highschool_administrator import HSPosition, HSAdministratorPosition
@@ -91,7 +91,7 @@ class registration_summary_highschools_DS(MyCE_BMailerDS):
         if count:
             return records.count()
 
-        terms = Term.objects.filter(id__in=filters.get('term'))
+        picked_terms, terms = summary_terms(filters.get('term'))
         for record in records:
 
             sections_assigned, registrations, sections_with_no_registrations, missing_payment, completed_application, missing_parent_consent = record.highschool.sections_summary(terms=terms)
@@ -109,8 +109,8 @@ class registration_summary_highschools_DS(MyCE_BMailerDS):
                 "MissingParentConsent": missing_parent_consent,
                 "AdministratorID": str(record.hsadmin.id),
                 "recipient_id": str(record.hsadmin.id),
-                "TermID": str(terms[0].id),
-                "Term": str(terms[0]),
+                "TermID": str(picked_terms[0].id),
+                "Term": str(picked_terms[0]),
             }
 
             result.append(row)

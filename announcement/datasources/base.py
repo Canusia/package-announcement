@@ -54,6 +54,23 @@ def sections_in_terms(term_ids):
     return ClassSection.objects.filter(term__id__in=expand_term_ids(term_ids or []))
 
 
+def summary_terms(term_ids):
+    """(picked, scope) for a registration-summary term filter.
+
+    ``picked`` is the Term list the user chose, newest code first with id as the
+    tie-break, so the merge fields are deterministic. ``scope`` is a Term
+    queryset of the picked terms plus their sub-terms, for ``sections_summary``.
+    """
+    from cis.models.term import Term
+    term_ids = term_ids or []
+    picked = list(Term.objects.filter(id__in=term_ids).order_by('-code', 'id'))
+    try:
+        from cis.services.term_hierarchy import expand_term_ids
+    except ImportError:
+        return picked, Term.objects.filter(id__in=term_ids)
+    return picked, Term.objects.filter(id__in=expand_term_ids(term_ids))
+
+
 class MyCE_BMailerForm(forms.Form):
     
     def __init__(self, form_type='skiny', datasource_name='', *args, **kwargs):
